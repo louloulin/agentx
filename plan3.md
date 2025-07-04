@@ -123,107 +123,165 @@
 5. **gRPC Server**: 插件通信服务器
 6. **Process Manager**: 插件进程管理
 
-#### 基于gRPC的插件架构
+#### 基于gRPC的通用插件架构
 
-类似go-plugin的设计，AgentX采用基于gRPC的插件系统：
+AgentX采用框架无关的gRPC插件系统，每个AI Agent框架通过标准化的gRPC接口接入：
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    AgentX Core Process                      │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────┐ │
-│  │ Plugin      │ │ gRPC        │ │ Process     │ │ Health  │ │
-│  │ Manager     │ │ Server      │ │ Manager     │ │ Monitor │ │
+│  │ gRPC Plugin │ │ A2A Protocol│ │ Agent       │ │ Message │ │
+│  │ Manager     │ │ Engine      │ │ Registry    │ │ Router  │ │
 │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────┘ │
 └─────────────────────────────────────────────────────────────┘
-                              │ gRPC
+                              │ gRPC (统一接口)
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   Plugin Process 1                          │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────┐ │
-│  │ Mastra      │ │ gRPC        │ │ Agent       │ │ Tool    │ │
-│  │ Adapter     │ │ Client      │ │ Handler     │ │ Manager │ │
-│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────┘ │
-└─────────────────────────────────────────────────────────────┘
-                              │ gRPC
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   Plugin Process 2                          │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────┐ │
-│  │ LangChain   │ │ gRPC        │ │ Agent       │ │ Tool    │ │
-│  │ Adapter     │ │ Client      │ │ Handler     │ │ Manager │ │
-│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────┘ │
+│                Framework Plugin Processes                   │
+├─────────────────────────────────────────────────────────────┤
+│ Mastra Plugin (Node.js)     │ LangChain Plugin (Python)    │
+│ ┌─────────────┐ ┌─────────┐  │ ┌─────────────┐ ┌─────────┐  │
+│ │ Mastra      │ │ gRPC    │  │ │ LangChain   │ │ gRPC    │  │
+│ │ Framework   │ │ Server  │  │ │ Framework   │ │ Server  │  │
+│ └─────────────┘ └─────────┘  │ └─────────────┘ └─────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│ AutoGen Plugin (Python)     │ CrewAI Plugin (Python)       │
+│ ┌─────────────┐ ┌─────────┐  │ ┌─────────────┐ ┌─────────┐  │
+│ │ AutoGen     │ │ gRPC    │  │ │ CrewAI      │ │ gRPC    │  │
+│ │ Framework   │ │ Server  │  │ │ Framework   │ │ Server  │  │
+│ └─────────────┘ └─────────┘  │ └─────────────┘ └─────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│ Semantic Kernel (C#)        │ Custom Plugin (Any Lang)     │
+│ ┌─────────────┐ ┌─────────┐  │ ┌─────────────┐ ┌─────────┐  │
+│ │ Semantic    │ │ gRPC    │  │ │ Custom      │ │ gRPC    │  │
+│ │ Kernel      │ │ Server  │  │ │ Framework   │ │ Server  │  │
+│ └─────────────┘ └─────────┘  │ └─────────────┘ └─────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-#### gRPC插件接口定义
+#### 通用gRPC插件接口定义
 
 ```protobuf
-// proto/plugin.proto
+// proto/agentx_plugin.proto
 syntax = "proto3";
 
 package agentx.plugin;
 
-// 插件服务接口
-service PluginService {
-    // 插件初始化
+// 通用插件服务接口 - 所有框架插件必须实现
+service AgentXPluginService {
+    // 插件生命周期管理
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
-
-    // 插件关闭
     rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
-
-    // 处理A2A消息
-    rpc HandleMessage(HandleMessageRequest) returns (HandleMessageResponse);
-
-    // 获取插件信息
     rpc GetInfo(GetInfoRequest) returns (GetInfoResponse);
-
-    // 健康检查
     rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 
-    // 流式消息处理
-    rpc HandleMessageStream(stream HandleMessageRequest) returns (stream HandleMessageResponse);
-}
-
-// Agent管理服务
-service AgentService {
-    // 注册Agent
-    rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);
-
-    // 注销Agent
-    rpc UnregisterAgent(UnregisterAgentRequest) returns (UnregisterAgentResponse);
-
-    // 获取Agent列表
+    // Agent管理
+    rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse);
+    rpc DeleteAgent(DeleteAgentRequest) returns (DeleteAgentResponse);
     rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+    rpc GetAgentInfo(GetAgentInfoRequest) returns (GetAgentInfoResponse);
 
-    // Agent能力查询
+    // 消息处理 - 核心功能
+    rpc ProcessMessage(ProcessMessageRequest) returns (ProcessMessageResponse);
+    rpc ProcessMessageStream(stream ProcessMessageRequest) returns (stream ProcessMessageResponse);
+
+    // 能力查询
     rpc GetCapabilities(GetCapabilitiesRequest) returns (GetCapabilitiesResponse);
+    rpc GetSupportedModels(GetSupportedModelsRequest) returns (GetSupportedModelsResponse);
+
+    // 工具和功能
+    rpc ListTools(ListToolsRequest) returns (ListToolsResponse);
+    rpc ExecuteTool(ExecuteToolRequest) returns (ExecuteToolResponse);
+
+    // 配置管理
+    rpc UpdateConfig(UpdateConfigRequest) returns (UpdateConfigResponse);
+    rpc GetConfig(GetConfigRequest) returns (GetConfigResponse);
 }
 
-// 消息定义
+// 核心数据结构
+message AgentInfo {
+    string id = 1;
+    string name = 2;
+    string framework = 3;  // "mastra", "langchain", "autogen", etc.
+    repeated string capabilities = 4;
+    map<string, string> metadata = 5;
+    AgentStatus status = 6;
+}
+
+enum AgentStatus {
+    UNKNOWN = 0;
+    INITIALIZING = 1;
+    READY = 2;
+    BUSY = 3;
+    ERROR = 4;
+    SHUTDOWN = 5;
+}
+
 message A2AMessage {
     string id = 1;
-    string from = 2;
-    string to = 3;
-    Intent intent = 4;
+    string from_agent_id = 2;
+    string to_agent_id = 3;
+    MessageType type = 4;
     MessagePayload payload = 5;
     map<string, string> metadata = 6;
     int64 timestamp = 7;
+    string conversation_id = 8;  // 对话上下文ID
+}
+
+enum MessageType {
+    TEXT = 0;
+    TOOL_CALL = 1;
+    TOOL_RESULT = 2;
+    SYSTEM = 3;
+    ERROR = 4;
+    WORKFLOW = 5;
 }
 
 message MessagePayload {
     oneof content {
-        string text = 1;
-        bytes binary = 2;
-        string json = 3;
+        TextMessage text = 1;
+        ToolCallMessage tool_call = 2;
+        ToolResultMessage tool_result = 3;
+        SystemMessage system = 4;
+        ErrorMessage error = 5;
+        WorkflowMessage workflow = 6;
     }
 }
 
-enum Intent {
-    QUERY = 0;
-    COMMAND = 1;
-    NOTIFICATION = 2;
-    DELEGATION = 3;
-    COLLABORATION = 4;
+message TextMessage {
+    string content = 1;
+    string role = 2;  // "user", "assistant", "system"
+}
+
+message ToolCallMessage {
+    string tool_name = 1;
+    string tool_id = 2;
+    map<string, string> parameters = 3;
+}
+
+message ToolResultMessage {
+    string tool_id = 1;
+    string result = 2;
+    bool success = 3;
+    string error = 4;
+}
+
+message SystemMessage {
+    string command = 1;
+    map<string, string> parameters = 2;
+}
+
+message ErrorMessage {
+    string code = 1;
+    string message = 2;
+    string details = 3;
+}
+
+message WorkflowMessage {
+    string workflow_id = 1;
+    string step_id = 2;
+    map<string, string> data = 3;
 }
 
 // 请求/响应消息
@@ -430,51 +488,62 @@ GET /api/v1/plugins
   - [ ] 服务发现机制
   - [ ] 健康检查和故障转移
 
-### 6.3 第三阶段：Mastra集成 (5周)
-- [ ] **Week 12-13**: Mastra适配器插件开发
-  - [ ] Mastra gRPC插件框架
-  - [ ] Node.js到Rust的FFI桥接
-  - [ ] Mastra Agent包装器
-- [ ] **Week 14-15**: 深度集成实现
-  - [ ] Mastra工具系统集成
-  - [ ] 工作流引擎适配
-  - [ ] 内存管理系统对接
-- [ ] **Week 16**: 测试和优化
-  - [ ] 集成测试套件
-  - [ ] 性能基准测试
-  - [ ] 错误处理和恢复
+### 6.3 第三阶段：多框架插件实现 (6周)
+- [ ] **Week 12-13**: 通用插件SDK开发
+  - [ ] 多语言gRPC插件SDK (Rust/Python/Node.js/Go/C#)
+  - [ ] 插件开发模板和脚手架
+  - [ ] 插件测试框架
+- [ ] **Week 14**: LangChain插件实现
+  - [ ] Python LangChain适配器
+  - [ ] LangChain Agent包装器
+  - [ ] 工具链集成测试
+- [ ] **Week 15**: AutoGen插件实现
+  - [ ] Python AutoGen适配器
+  - [ ] 多Agent对话支持
+  - [ ] 群组对话路由
+- [ ] **Week 16**: Mastra插件实现
+  - [ ] Node.js Mastra适配器
+  - [ ] TypeScript绑定和FFI
+  - [ ] 工作流引擎集成
+- [ ] **Week 17**: 其他框架插件
+  - [ ] CrewAI插件实现
+  - [ ] Semantic Kernel插件实现
+  - [ ] 插件兼容性测试
 
-### 6.4 第四阶段：扩展功能 (6周)
-- [ ] **Week 17-18**: 安全认证和权限控制
+### 6.4 第四阶段：高级功能和优化 (6周)
+- [ ] **Week 18-19**: 安全认证和权限控制
   - [ ] JWT认证系统
   - [ ] RBAC权限模型
   - [ ] TLS加密通信
-- [ ] **Week 19-20**: 监控和可观测性
+  - [ ] 插件沙箱隔离
+- [ ] **Week 20-21**: 监控和可观测性
   - [ ] Prometheus指标集成
   - [ ] 分布式追踪系统
   - [ ] 日志聚合和分析
-- [ ] **Week 21-22**: 性能优化和压力测试
-  - [ ] 零拷贝消息传递优化
-  - [ ] 连接池和缓存优化
-  - [ ] 大规模压力测试
+  - [ ] 插件性能监控
+- [ ] **Week 22-23**: 性能优化和压力测试
+  - [ ] gRPC连接池优化
+  - [ ] 消息序列化优化
+  - [ ] 大规模插件部署测试
+  - [ ] 故障恢复机制
 
-### 6.5 第五阶段：生态扩展 (8周)
-- [ ] **Week 23-24**: 多语言插件SDK
-  - [ ] Go插件SDK开发
-  - [ ] Python插件SDK开发
-  - [ ] Node.js插件SDK开发
-- [ ] **Week 25-26**: 其他框架适配器
-  - [ ] LangChain适配器插件
-  - [ ] AutoGen适配器插件
-  - [ ] 自定义框架适配器模板
-- [ ] **Week 27-28**: 协议兼容和云部署
+### 6.5 第五阶段：生态建设和扩展 (7周)
+- [ ] **Week 24-25**: 协议兼容和标准化
   - [ ] MCP协议兼容层
+  - [ ] OpenAI Assistant API适配
+  - [ ] 其他主流协议支持
+- [ ] **Week 26-27**: 云原生部署
   - [ ] Kubernetes Operator开发
-  - [ ] 云原生部署支持
-- [ ] **Week 29-30**: 社区工具和文档
+  - [ ] Helm Charts
+  - [ ] 多云部署支持
+- [ ] **Week 28-29**: 开发者生态
   - [ ] 插件市场和注册中心
-  - [ ] 开发者文档和教程
-  - [ ] 示例应用和最佳实践
+  - [ ] CLI工具完善
+  - [ ] VS Code扩展
+- [ ] **Week 30**: 文档和社区
+  - [ ] 完整的开发者文档
+  - [ ] 示例应用和教程
+  - [ ] 社区治理和贡献指南
 
 ## 7. gRPC插件系统优势分析
 
@@ -706,11 +775,11 @@ let client = PluginServiceClient::new(channel)
 
 #### 插件开发SDK
 
-**Rust插件开发**
+**通用Rust插件开发框架**
 ```rust
 // Cargo.toml
 [package]
-name = "mastra-plugin"
+name = "agentx-framework-plugin"
 version = "0.1.0"
 edition = "2021"
 
@@ -719,211 +788,565 @@ agentx-plugin-sdk = "0.1.0"
 tokio = { version = "1.0", features = ["full"] }
 tonic = "0.10"
 prost = "0.12"
+async-trait = "0.1"
 
 // src/main.rs
-use agentx_plugin_sdk::{PluginBuilder, PluginResult, A2AMessage, MessagePayload};
-use tonic::{Request, Response, Status};
+use agentx_plugin_sdk::{
+    AgentXPlugin, PluginServer, AgentInfo, A2AMessage,
+    ProcessMessageRequest, ProcessMessageResponse, PluginResult
+};
+use std::collections::HashMap;
+use tokio::sync::RwLock;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let plugin = MastraPlugin::new();
+    // 从环境变量获取框架类型
+    let framework = std::env::var("AGENTX_FRAMEWORK").unwrap_or_else(|_| "generic".to_string());
 
-    PluginBuilder::new("mastra-plugin", "1.0.0")
-        .with_capabilities(vec!["text-generation", "tool-calling"])
-        .with_framework("mastra")
-        .with_handler(plugin)
-        .serve()
-        .await?;
+    let plugin = match framework.as_str() {
+        "mastra" => Box::new(MastraFrameworkPlugin::new().await?) as Box<dyn AgentXPlugin>,
+        "langchain" => Box::new(LangChainFrameworkPlugin::new().await?) as Box<dyn AgentXPlugin>,
+        "autogen" => Box::new(AutoGenFrameworkPlugin::new().await?) as Box<dyn AgentXPlugin>,
+        _ => return Err("Unsupported framework".into()),
+    };
+
+    let server = PluginServer::new(plugin);
+    server.serve().await?;
 
     Ok(())
 }
 
-struct MastraPlugin {
-    // Mastra集成逻辑
+// 通用插件trait
+#[async_trait::async_trait]
+pub trait AgentXPlugin: Send + Sync {
+    async fn initialize(&mut self, config: HashMap<String, String>) -> PluginResult<()>;
+    async fn shutdown(&mut self) -> PluginResult<()>;
+
+    async fn create_agent(&mut self, request: CreateAgentRequest) -> PluginResult<AgentInfo>;
+    async fn delete_agent(&mut self, agent_id: &str) -> PluginResult<()>;
+    async fn list_agents(&self) -> PluginResult<Vec<AgentInfo>>;
+
+    async fn process_message(&self, request: ProcessMessageRequest) -> PluginResult<ProcessMessageResponse>;
+
+    async fn get_capabilities(&self) -> Vec<String>;
+    async fn get_framework_info(&self) -> FrameworkInfo;
 }
 
-impl MastraPlugin {
-    fn new() -> Self {
-        Self {}
+// Mastra框架插件实现
+struct MastraFrameworkPlugin {
+    agents: RwLock<HashMap<String, MastraAgent>>,
+    // Mastra特定的配置和状态
+}
+
+impl MastraFrameworkPlugin {
+    async fn new() -> PluginResult<Self> {
+        Ok(Self {
+            agents: RwLock::new(HashMap::new()),
+        })
     }
 }
 
 #[async_trait::async_trait]
-impl agentx_plugin_sdk::PluginHandler for MastraPlugin {
-    async fn initialize(&mut self, config: std::collections::HashMap<String, String>) -> PluginResult<()> {
-        // 初始化Mastra Agent
-        println!("Initializing Mastra plugin with config: {:?}", config);
+impl AgentXPlugin for MastraFrameworkPlugin {
+    async fn initialize(&mut self, config: HashMap<String, String>) -> PluginResult<()> {
+        // 初始化Mastra环境
+        println!("Initializing Mastra framework plugin");
+        // 这里可以启动Node.js进程或通过FFI调用Mastra
         Ok(())
     }
 
-    async fn handle_message(&self, message: A2AMessage) -> PluginResult<A2AMessage> {
-        // 处理A2A消息，转发给Mastra Agent
-        match message.payload {
-            MessagePayload::Text(text) => {
-                // 调用Mastra Agent处理
-                let response_text = self.process_with_mastra(&text).await?;
+    async fn create_agent(&mut self, request: CreateAgentRequest) -> PluginResult<AgentInfo> {
+        // 创建Mastra Agent
+        let agent_id = uuid::Uuid::new_v4().to_string();
+        let agent = MastraAgent::new(&request.name, &request.config).await?;
 
-                Ok(A2AMessage {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    from: message.to,
-                    to: message.from,
-                    intent: message.intent,
-                    payload: MessagePayload::Text(response_text),
-                    metadata: message.metadata,
-                    timestamp: chrono::Utc::now(),
-                })
-            }
-            _ => Err("Unsupported message type".into()),
+        self.agents.write().await.insert(agent_id.clone(), agent);
+
+        Ok(AgentInfo {
+            id: agent_id,
+            name: request.name,
+            framework: "mastra".to_string(),
+            capabilities: vec!["text-generation".to_string(), "tool-calling".to_string()],
+            metadata: request.metadata,
+            status: AgentStatus::Ready,
+        })
+    }
+
+    async fn process_message(&self, request: ProcessMessageRequest) -> PluginResult<ProcessMessageResponse> {
+        let agents = self.agents.read().await;
+        if let Some(agent) = agents.get(&request.agent_id) {
+            // 使用Mastra Agent处理消息
+            let response = agent.process_message(&request.message).await?;
+            Ok(ProcessMessageResponse {
+                message: response,
+                success: true,
+                error: None,
+            })
+        } else {
+            Err("Agent not found".into())
         }
     }
 
-    async fn shutdown(&mut self) -> PluginResult<()> {
-        println!("Shutting down Mastra plugin");
-        Ok(())
-    }
-
     async fn get_capabilities(&self) -> Vec<String> {
-        vec!["text-generation".to_string(), "tool-calling".to_string()]
+        vec![
+            "text-generation".to_string(),
+            "tool-calling".to_string(),
+            "workflow-execution".to_string(),
+            "memory-management".to_string(),
+        ]
+    }
+
+    async fn get_framework_info(&self) -> FrameworkInfo {
+        FrameworkInfo {
+            name: "Mastra".to_string(),
+            version: "1.0.0".to_string(),
+            language: "TypeScript".to_string(),
+            description: "TypeScript agent framework with workflows and RAG".to_string(),
+        }
     }
 }
 
-impl MastraPlugin {
-    async fn process_with_mastra(&self, input: &str) -> PluginResult<String> {
-        // 这里集成实际的Mastra逻辑
-        // 可以通过FFI调用Node.js中的Mastra代码
-        Ok(format!("Mastra processed: {}", input))
-    }
-}
-```
-
-**Go插件开发**
-```go
-// go.mod
-module mastra-plugin-go
-
-go 1.21
-
-require (
-    github.com/agentx/plugin-sdk-go v0.1.0
-    google.golang.org/grpc v1.58.0
-    google.golang.org/protobuf v1.31.0
-)
-
-// main.go
-package main
-
-import (
-    "context"
-    "log"
-
-    "github.com/agentx/plugin-sdk-go/pkg/plugin"
-    "github.com/agentx/plugin-sdk-go/pkg/proto"
-)
-
-type MastraPlugin struct {
-    // Mastra集成逻辑
+// Mastra Agent包装器
+struct MastraAgent {
+    // Mastra Agent的包装
 }
 
-func (p *MastraPlugin) Initialize(ctx context.Context, config map[string]string) error {
-    log.Printf("Initializing Mastra Go plugin with config: %v", config)
-    return nil
-}
-
-func (p *MastraPlugin) HandleMessage(ctx context.Context, msg *proto.A2AMessage) (*proto.A2AMessage, error) {
-    // 处理消息逻辑
-    response := &proto.A2AMessage{
-        Id:     generateUUID(),
-        From:   msg.To,
-        To:     msg.From,
-        Intent: msg.Intent,
-        Payload: &proto.MessagePayload{
-            Content: &proto.MessagePayload_Text{
-                Text: "Go plugin processed: " + msg.GetPayload().GetText(),
-            },
-        },
-        Metadata:  msg.Metadata,
-        Timestamp: time.Now().Unix(),
+impl MastraAgent {
+    async fn new(name: &str, config: &HashMap<String, String>) -> PluginResult<Self> {
+        // 创建Mastra Agent实例
+        Ok(Self {})
     }
 
-    return response, nil
-}
-
-func (p *MastraPlugin) Shutdown(ctx context.Context) error {
-    log.Println("Shutting down Mastra Go plugin")
-    return nil
-}
-
-func (p *MastraPlugin) GetCapabilities() []string {
-    return []string{"text-generation", "tool-calling"}
-}
-
-func main() {
-    plugin := &MastraPlugin{}
-
-    server := plugin.NewPluginServer("mastra-plugin-go", "1.0.0", plugin)
-
-    if err := server.Serve(); err != nil {
-        log.Fatalf("Failed to serve plugin: %v", err)
+    async fn process_message(&self, message: &A2AMessage) -> PluginResult<A2AMessage> {
+        // 调用Mastra Agent处理消息
+        // 这里可以通过FFI或进程间通信调用Node.js中的Mastra代码
+        Ok(A2AMessage {
+            id: uuid::Uuid::new_v4().to_string(),
+            from_agent_id: message.to_agent_id.clone(),
+            to_agent_id: message.from_agent_id.clone(),
+            type_: MessageType::Text,
+            payload: Some(MessagePayload {
+                content: Some(message_payload::Content::Text(TextMessage {
+                    content: format!("Mastra processed: {:?}", message),
+                    role: "assistant".to_string(),
+                })),
+            }),
+            metadata: message.metadata.clone(),
+            timestamp: chrono::Utc::now().timestamp(),
+            conversation_id: message.conversation_id.clone(),
+        })
     }
 }
 ```
 
-**Python插件开发**
+**LangChain Python插件开发**
 ```python
 # requirements.txt
 agentx-plugin-sdk==0.1.0
+langchain==0.1.0
+langchain-openai==0.1.0
 grpcio==1.58.0
 grpcio-tools==1.58.0
 
-# main.py
+# langchain_plugin.py
 import asyncio
 import logging
-from typing import Dict, List
-from agentx_plugin_sdk import PluginBuilder, A2AMessage, MessagePayload
+from typing import Dict, List, Optional
+from agentx_plugin_sdk import AgentXPlugin, PluginServer, AgentInfo, A2AMessage
+from langchain.agents import AgentExecutor, create_openai_functions_agent
+from langchain.tools import Tool
+from langchain_openai import ChatOpenAI
+from langchain.prompts import ChatPromptTemplate
 
-class MastraPlugin:
+class LangChainFrameworkPlugin(AgentXPlugin):
     def __init__(self):
+        self.agents: Dict[str, LangChainAgentWrapper] = {}
         self.logger = logging.getLogger(__name__)
 
     async def initialize(self, config: Dict[str, str]) -> None:
-        self.logger.info(f"Initializing Mastra Python plugin with config: {config}")
+        self.logger.info(f"Initializing LangChain plugin with config: {config}")
+        # 初始化LangChain环境
+        self.openai_api_key = config.get("openai_api_key")
+        if not self.openai_api_key:
+            raise ValueError("OpenAI API key is required")
 
-    async def handle_message(self, message: A2AMessage) -> A2AMessage:
-        # 处理消息逻辑
-        if isinstance(message.payload, MessagePayload.Text):
-            response_text = await self.process_with_mastra(message.payload.text)
+    async def create_agent(self, request) -> AgentInfo:
+        agent_id = str(uuid.uuid4())
+
+        # 创建LangChain Agent
+        llm = ChatOpenAI(
+            api_key=self.openai_api_key,
+            model=request.config.get("model", "gpt-4"),
+            temperature=float(request.config.get("temperature", "0.7"))
+        )
+
+        # 创建工具
+        tools = self._create_tools(request.config.get("tools", []))
+
+        # 创建prompt
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", request.config.get("system_prompt", "You are a helpful assistant.")),
+            ("human", "{input}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ])
+
+        # 创建agent
+        agent = create_openai_functions_agent(llm, tools, prompt)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+        wrapper = LangChainAgentWrapper(agent_executor, request.name)
+        self.agents[agent_id] = wrapper
+
+        return AgentInfo(
+            id=agent_id,
+            name=request.name,
+            framework="langchain",
+            capabilities=["text-generation", "tool-calling", "reasoning"],
+            metadata=request.metadata,
+            status="ready"
+        )
+
+    async def process_message(self, request) -> ProcessMessageResponse:
+        if request.agent_id not in self.agents:
+            return ProcessMessageResponse(
+                success=False,
+                error="Agent not found"
+            )
+
+        agent = self.agents[request.agent_id]
+        try:
+            response = await agent.process_message(request.message)
+            return ProcessMessageResponse(
+                message=response,
+                success=True
+            )
+        except Exception as e:
+            return ProcessMessageResponse(
+                success=False,
+                error=str(e)
+            )
+
+    def get_capabilities(self) -> List[str]:
+        return [
+            "text-generation",
+            "tool-calling",
+            "reasoning",
+            "memory",
+            "document-qa"
+        ]
+
+    def get_framework_info(self):
+        return {
+            "name": "LangChain",
+            "version": "0.1.0",
+            "language": "Python",
+            "description": "Building applications with LLMs through composability"
+        }
+
+    def _create_tools(self, tool_configs: List[str]) -> List[Tool]:
+        tools = []
+        for tool_config in tool_configs:
+            # 根据配置创建工具
+            if tool_config == "search":
+                tools.append(Tool(
+                    name="search",
+                    description="Search the internet for information",
+                    func=self._search_tool
+                ))
+        return tools
+
+    def _search_tool(self, query: str) -> str:
+        # 实现搜索工具
+        return f"Search results for: {query}"
+
+class LangChainAgentWrapper:
+    def __init__(self, agent_executor: AgentExecutor, name: str):
+        self.agent_executor = agent_executor
+        self.name = name
+
+    async def process_message(self, message: A2AMessage) -> A2AMessage:
+        # 提取文本内容
+        if message.payload and message.payload.text:
+            input_text = message.payload.text.content
+
+            # 使用LangChain Agent处理
+            result = await self.agent_executor.ainvoke({"input": input_text})
+
+            # 构造响应消息
+            response = A2AMessage(
+                id=str(uuid.uuid4()),
+                from_agent_id=message.to_agent_id,
+                to_agent_id=message.from_agent_id,
+                type="TEXT",
+                payload={
+                    "text": {
+                        "content": result["output"],
+                        "role": "assistant"
+                    }
+                },
+                metadata=message.metadata,
+                timestamp=int(time.time()),
+                conversation_id=message.conversation_id
+            )
+
+            return response
+
+        raise ValueError("Unsupported message type")
+
+async def main():
+    plugin = LangChainFrameworkPlugin()
+    server = PluginServer(plugin)
+    await server.serve()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+**AutoGen Python插件开发**
+```python
+# requirements.txt
+agentx-plugin-sdk==0.1.0
+pyautogen==0.2.0
+grpcio==1.58.0
+grpcio-tools==1.58.0
+
+# autogen_plugin.py
+import asyncio
+import logging
+from typing import Dict, List, Optional
+from agentx_plugin_sdk import AgentXPlugin, PluginServer, AgentInfo, A2AMessage
+import autogen
+from autogen import AssistantAgent, UserProxyAgent, GroupChat, GroupChatManager
+
+class AutoGenFrameworkPlugin(AgentXPlugin):
+    def __init__(self):
+        self.group_chats: Dict[str, AutoGenGroupWrapper] = {}
+        self.agents: Dict[str, AutoGenAgentWrapper] = {}
+        self.logger = logging.getLogger(__name__)
+
+    async def initialize(self, config: Dict[str, str]) -> None:
+        self.logger.info(f"Initializing AutoGen plugin with config: {config}")
+
+        # 配置LLM
+        self.llm_config = {
+            "config_list": [{
+                "model": config.get("model", "gpt-4"),
+                "api_key": config.get("openai_api_key"),
+                "api_type": "openai",
+            }],
+            "temperature": float(config.get("temperature", "0.7")),
+        }
+
+    async def create_agent(self, request) -> AgentInfo:
+        agent_id = str(uuid.uuid4())
+        agent_type = request.config.get("agent_type", "assistant")
+
+        if agent_type == "group_chat":
+            # 创建群组对话
+            wrapper = await self._create_group_chat(agent_id, request)
+            self.group_chats[agent_id] = wrapper
+        else:
+            # 创建单个Agent
+            wrapper = await self._create_single_agent(agent_id, request)
+            self.agents[agent_id] = wrapper
+
+        return AgentInfo(
+            id=agent_id,
+            name=request.name,
+            framework="autogen",
+            capabilities=["multi-agent-chat", "code-execution", "reasoning"],
+            metadata=request.metadata,
+            status="ready"
+        )
+
+    async def _create_group_chat(self, agent_id: str, request) -> 'AutoGenGroupWrapper':
+        # 创建多个Agent组成群组
+        agents = []
+
+        # 创建助手Agent
+        assistant = AssistantAgent(
+            name="assistant",
+            system_message=request.config.get("assistant_prompt",
+                "You are a helpful AI assistant."),
+            llm_config=self.llm_config,
+        )
+        agents.append(assistant)
+
+        # 创建用户代理
+        user_proxy = UserProxyAgent(
+            name="user_proxy",
+            human_input_mode="NEVER",
+            max_consecutive_auto_reply=10,
+            code_execution_config={"work_dir": "coding"},
+        )
+        agents.append(user_proxy)
+
+        # 如果配置了专家Agent，添加它们
+        if "experts" in request.config:
+            for expert_config in request.config["experts"]:
+                expert = AssistantAgent(
+                    name=expert_config["name"],
+                    system_message=expert_config["prompt"],
+                    llm_config=self.llm_config,
+                )
+                agents.append(expert)
+
+        # 创建群组对话
+        group_chat = GroupChat(
+            agents=agents,
+            messages=[],
+            max_round=int(request.config.get("max_rounds", "10"))
+        )
+
+        manager = GroupChatManager(
+            groupchat=group_chat,
+            llm_config=self.llm_config
+        )
+
+        return AutoGenGroupWrapper(group_chat, manager, request.name)
+
+    async def _create_single_agent(self, agent_id: str, request) -> 'AutoGenAgentWrapper':
+        agent_type = request.config.get("agent_type", "assistant")
+
+        if agent_type == "assistant":
+            agent = AssistantAgent(
+                name=request.name,
+                system_message=request.config.get("system_message",
+                    "You are a helpful AI assistant."),
+                llm_config=self.llm_config,
+            )
+        elif agent_type == "user_proxy":
+            agent = UserProxyAgent(
+                name=request.name,
+                human_input_mode="NEVER",
+                max_consecutive_auto_reply=10,
+                code_execution_config={"work_dir": "coding"},
+            )
+        else:
+            raise ValueError(f"Unsupported agent type: {agent_type}")
+
+        return AutoGenAgentWrapper(agent, request.name)
+
+    async def process_message(self, request) -> ProcessMessageResponse:
+        agent_id = request.agent_id
+
+        # 检查是群组对话还是单个Agent
+        if agent_id in self.group_chats:
+            wrapper = self.group_chats[agent_id]
+        elif agent_id in self.agents:
+            wrapper = self.agents[agent_id]
+        else:
+            return ProcessMessageResponse(
+                success=False,
+                error="Agent not found"
+            )
+
+        try:
+            response = await wrapper.process_message(request.message)
+            return ProcessMessageResponse(
+                message=response,
+                success=True
+            )
+        except Exception as e:
+            return ProcessMessageResponse(
+                success=False,
+                error=str(e)
+            )
+
+    def get_capabilities(self) -> List[str]:
+        return [
+            "multi-agent-chat",
+            "code-execution",
+            "reasoning",
+            "collaboration",
+            "expert-consultation"
+        ]
+
+    def get_framework_info(self):
+        return {
+            "name": "AutoGen",
+            "version": "0.2.0",
+            "language": "Python",
+            "description": "Multi-agent conversation framework"
+        }
+
+class AutoGenGroupWrapper:
+    def __init__(self, group_chat: GroupChat, manager: GroupChatManager, name: str):
+        self.group_chat = group_chat
+        self.manager = manager
+        self.name = name
+
+    async def process_message(self, message: A2AMessage) -> A2AMessage:
+        if message.payload and message.payload.text:
+            input_text = message.payload.text.content
+
+            # 启动群组对话
+            user_proxy = self.group_chat.agents[1]  # 假设第二个是user_proxy
+
+            # 在群组中发起对话
+            await user_proxy.a_initiate_chat(
+                self.manager,
+                message=input_text
+            )
+
+            # 获取最后的回复
+            last_message = self.group_chat.messages[-1] if self.group_chat.messages else None
+            response_text = last_message["content"] if last_message else "No response"
 
             return A2AMessage(
                 id=str(uuid.uuid4()),
-                from_=message.to,
-                to=message.from_,
-                intent=message.intent,
-                payload=MessagePayload.Text(response_text),
+                from_agent_id=message.to_agent_id,
+                to_agent_id=message.from_agent_id,
+                type="TEXT",
+                payload={
+                    "text": {
+                        "content": response_text,
+                        "role": "assistant"
+                    }
+                },
                 metadata=message.metadata,
-                timestamp=datetime.utcnow()
+                timestamp=int(time.time()),
+                conversation_id=message.conversation_id
             )
 
         raise ValueError("Unsupported message type")
 
-    async def shutdown(self) -> None:
-        self.logger.info("Shutting down Mastra Python plugin")
+class AutoGenAgentWrapper:
+    def __init__(self, agent, name: str):
+        self.agent = agent
+        self.name = name
 
-    def get_capabilities(self) -> List[str]:
-        return ["text-generation", "tool-calling"]
+    async def process_message(self, message: A2AMessage) -> A2AMessage:
+        if message.payload and message.payload.text:
+            input_text = message.payload.text.content
 
-    async def process_with_mastra(self, input_text: str) -> str:
-        # 这里集成实际的Mastra逻辑
-        return f"Python Mastra processed: {input_text}"
+            # 生成回复
+            response = await self.agent.a_generate_reply(
+                messages=[{"role": "user", "content": input_text}]
+            )
+
+            return A2AMessage(
+                id=str(uuid.uuid4()),
+                from_agent_id=message.to_agent_id,
+                to_agent_id=message.from_agent_id,
+                type="TEXT",
+                payload={
+                    "text": {
+                        "content": response,
+                        "role": "assistant"
+                    }
+                },
+                metadata=message.metadata,
+                timestamp=int(time.time()),
+                conversation_id=message.conversation_id
+            )
+
+        raise ValueError("Unsupported message type")
 
 async def main():
-    plugin = MastraPlugin()
-
-    builder = PluginBuilder("mastra-plugin-python", "1.0.0")
-    builder.with_capabilities(["text-generation", "tool-calling"])
-    builder.with_framework("mastra")
-    builder.with_handler(plugin)
-
-    await builder.serve()
+    plugin = AutoGenFrameworkPlugin()
+    server = PluginServer(plugin)
+    await server.serve()
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -2287,22 +2710,27 @@ AgentX项目通过构建基于A2A协议的通用AI Agent平台，解决了当前
 - **扩展困难**: 架构限制了系统扩展
 
 ### 20.2 技术创新
-- **gRPC插件架构**: 首个基于gRPC的AI Agent插件系统
-  - 进程级隔离保证系统稳定性
-  - 多语言生态支持
-  - 分布式部署能力
-- **A2A协议实现**: 完整的A2A协议Rust实现
-  - 标准化的Agent间通信
-  - 高性能消息路由
-- **微内核设计**: 最小化核心，最大化扩展性
-  - 插件热插拔支持
-  - 故障隔离和自动恢复
-- **多框架统一**: 统一平台支持多种AI框架
-  - Mastra深度集成
-  - LangChain、AutoGen等适配
-- **云原生架构**: 为云环境优化的设计
-  - Kubernetes原生支持
-  - 水平扩展能力
+- **通用gRPC插件架构**: 首个框架无关的AI Agent插件系统
+  - 统一的gRPC接口标准，支持任何AI框架接入
+  - 进程级隔离保证系统稳定性和安全性
+  - 多语言生态支持(Rust/Python/Node.js/Go/C#等)
+  - 分布式部署和水平扩展能力
+- **A2A协议标准化实现**: 完整的A2A协议Rust实现
+  - 标准化的Agent间通信协议
+  - 高性能消息路由和转发
+  - 跨框架Agent互操作能力
+- **微内核设计哲学**: 最小化核心，最大化扩展性
+  - 插件热插拔和动态管理
+  - 故障隔离和自动恢复机制
+  - 资源管理和性能监控
+- **框架平等支持**: 不偏向任何特定框架的通用平台
+  - LangChain、AutoGen、Mastra、CrewAI等平等支持
+  - 统一的插件开发体验
+  - 标准化的Agent生命周期管理
+- **云原生架构**: 为现代云环境优化的设计
+  - Kubernetes原生支持和Operator
+  - 容器化插件部署
+  - 服务网格集成和流量管理
 
 ### 20.3 商业前景
 - **市场需求**: AI Agent市场快速增长
@@ -2337,4 +2765,4 @@ AgentX项目通过构建基于A2A协议的通用AI Agent平台，解决了当前
 └── 市场领导
 ```
 
-AgentX项目将成为AI Agent互操作的标准平台，推动整个AI Agent生态系统的发展，为开发者和企业提供高性能、可扩展、标准化的AI Agent解决方案。
+AgentX项目将成为AI Agent互操作的标准平台，通过框架无关的gRPC插件架构，真正实现"一个平台，支持所有框架"的愿景。它将推动整个AI Agent生态系统的发展，为开发者和企业提供高性能、可扩展、标准化的通用AI Agent解决方案，让不同框架的Agent能够无缝协作，共同构建更强大的AI应用。
