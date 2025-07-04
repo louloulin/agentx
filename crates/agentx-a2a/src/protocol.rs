@@ -34,21 +34,24 @@ pub struct A2AProtocolEngine {
 pub struct ProtocolConfig {
     /// Maximum message size in bytes
     pub max_message_size: usize,
-    
+
     /// Default message timeout in seconds
     pub default_timeout: u64,
-    
+
     /// Maximum number of hops for message routing
     pub max_hops: u8,
-    
+
     /// Enable message validation
     pub validate_messages: bool,
-    
+
     /// Enable capability caching
     pub cache_capabilities: bool,
-    
+
     /// Rate limiting configuration
     pub rate_limit: Option<RateLimitConfig>,
+
+    /// Handler pool size for actor-based processing
+    pub handler_pool_size: Option<usize>,
 }
 
 /// Rate limiting configuration

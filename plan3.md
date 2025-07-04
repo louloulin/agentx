@@ -99,31 +99,119 @@
 │  │ (C#)        │ │ (Python)    │ │ Plugin      │ │         │ │
 │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────┘ │
 ├─────────────────────────────────────────────────────────────┤
-│  Core Services Layer                                        │
+│  Actix Actor Layer (Core Services)                         │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────┐ │
 │  │ A2A Protocol│ │ Agent       │ │ Message     │ │ Security│ │
-│  │ Engine      │ │ Registry    │ │ Router      │ │ Manager │ │
+│  │ Actor       │ │ Registry    │ │ Router      │ │ Manager │ │
+│  │             │ │ Actor       │ │ Actor       │ │ Actor   │ │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────┘ │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────┐ │
+│  │ Plugin      │ │ Health      │ │ Metrics     │ │ Event   │ │
+│  │ Supervisor  │ │ Monitor     │ │ Collector   │ │ Bus     │ │
+│  │ Actor       │ │ Actor       │ │ Actor       │ │ Actor   │ │
 │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────┘ │
 ├─────────────────────────────────────────────────────────────┤
-│  Microkernel (Rust Core)                                   │
+│  Microkernel (Rust Core + Actix Runtime)                   │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────┐ │
-│  │ gRPC Plugin │ │ Event       │ │ Resource    │ │ Config  │ │
-│  │ Manager     │ │ System      │ │ Manager     │ │ Manager │ │
+│  │ Actor       │ │ gRPC        │ │ Resource    │ │ Config  │ │
+│  │ System      │ │ Server      │ │ Manager     │ │ Manager │ │
 │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 3.2 微内核设计
+### 3.2 基于Actix Actor的微内核设计
 
-#### 核心组件
-1. **Plugin Manager**: 基于gRPC的插件生命周期管理
-2. **Event System**: 异步事件驱动架构
-3. **Resource Manager**: 资源分配和管理
-4. **Config Manager**: 配置管理和热更新
-5. **gRPC Server**: 插件通信服务器
-6. **Process Manager**: 插件进程管理
+#### 核心组件（Actor化）
+1. **Plugin Supervisor Actor**: 基于gRPC的插件生命周期管理和监督
+2. **Event Bus Actor**: 异步事件驱动架构和消息分发
+3. **Resource Manager Actor**: 资源分配和管理
+4. **Config Manager Actor**: 配置管理和热更新
+5. **gRPC Server**: 插件通信服务器（非Actor，保持现有架构）
+6. **Health Monitor Actor**: 插件进程健康监控
 
-#### 基于gRPC的通用插件架构
+#### Actix Actor模型在AgentX中的应用分析
+
+**适合Actor模型的组件：**
+
+1. **A2A Protocol Engine Actor**
+   - **并发处理**: 同时处理多个A2A消息
+   - **状态管理**: 维护协议状态和连接信息
+   - **容错性**: Actor崩溃不影响其他组件
+   - **消息传递**: 天然适合消息路由场景
+
+2. **Agent Registry Actor**
+   - **状态隔离**: 独立管理Agent注册信息
+   - **并发访问**: 多个组件同时查询Agent信息
+   - **数据一致性**: Actor内部状态保证一致性
+   - **事件通知**: Agent状态变化事件分发
+
+3. **Message Router Actor**
+   - **负载均衡**: 智能消息路由和负载分配
+   - **故障转移**: 自动处理路由失败和重试
+   - **性能监控**: 实时路由性能统计
+   - **动态配置**: 运行时调整路由策略
+
+4. **Plugin Supervisor Actor**
+   - **进程监督**: 监督gRPC插件进程生命周期
+   - **故障恢复**: 自动重启失败的插件
+   - **资源管理**: 控制插件资源使用
+   - **健康检查**: 定期检查插件健康状态
+
+5. **Security Manager Actor**
+   - **认证授权**: 集中处理安全认证
+   - **会话管理**: 维护用户会话状态
+   - **权限控制**: 动态权限检查和更新
+   - **审计日志**: 安全事件记录和分析
+
+**保持现有架构的组件：**
+
+1. **gRPC插件系统**
+   - **进程隔离**: 保持插件进程独立性
+   - **多语言支持**: 继续支持各种编程语言
+   - **标准化接口**: 维持统一的gRPC接口
+   - **部署灵活性**: 支持分布式插件部署
+
+2. **HTTP/REST API服务器**
+   - **Web兼容性**: 保持标准HTTP接口
+   - **客户端支持**: 支持各种HTTP客户端
+   - **负载均衡**: 利用现有HTTP负载均衡方案
+   - **缓存策略**: 使用HTTP缓存机制
+
+#### Actor系统架构设计
+
+**Actor层次结构：**
+
+```
+AgentX Actor System
+├── System Supervisor (Root Actor)
+│   ├── A2A Protocol Actor
+│   │   ├── Message Handler Actors (Pool)
+│   │   └── Protocol State Actor
+│   ├── Agent Registry Actor
+│   │   ├── Discovery Actor
+│   │   └── Capability Matcher Actor
+│   ├── Message Router Actor
+│   │   ├── Route Calculator Actor
+│   │   └── Load Balancer Actor
+│   ├── Plugin Supervisor Actor
+│   │   ├── Plugin Manager Actors (per plugin)
+│   │   └── Health Monitor Actor
+│   ├── Security Manager Actor
+│   │   ├── Auth Actor
+│   │   └── Audit Actor
+│   └── Metrics Collector Actor
+       ├── Performance Monitor Actor
+       └── Event Aggregator Actor
+```
+
+**Actor通信模式：**
+
+1. **请求-响应模式**: A2A消息处理
+2. **发布-订阅模式**: 事件通知和状态更新
+3. **监督模式**: 故障检测和恢复
+4. **工作池模式**: 并发消息处理
+
+#### 基于gRPC的通用插件架构（保持不变）
 
 AgentX采用框架无关的gRPC插件系统，每个AI Agent框架通过标准化的gRPC接口接入：
 
@@ -756,14 +844,22 @@ let client = PluginServiceClient::new(channel)
 
 ### 8.1 核心技术栈
 - **语言**: Rust (微内核) + 多语言插件支持
-- **异步运行时**: Tokio
-- **Web框架**: Axum (REST API)
+- **Actor系统**: Actix (并发和容错)
+- **异步运行时**: Tokio + Actix Runtime
+- **Web框架**: Actix-Web (HTTP API) + Axum (备选)
 - **RPC框架**: Tonic (gRPC)
 - **序列化**: Protocol Buffers + Serde
 - **数据库**: PostgreSQL + Redis
 - **消息队列**: Apache Kafka / RabbitMQ
 - **进程管理**: Tokio Process
 - **服务发现**: Consul / etcd
+
+#### Actix Actor系统优势
+- **并发性**: 轻量级Actor并发模型
+- **容错性**: 监督树和故障隔离
+- **可扩展性**: 动态Actor创建和销毁
+- **消息传递**: 类型安全的消息系统
+- **背压处理**: 自动背压和流量控制
 
 ### 8.2 插件开发
 

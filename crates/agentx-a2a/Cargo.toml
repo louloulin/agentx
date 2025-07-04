@@ -6,6 +6,11 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
+# Actor系统
+actix.workspace = true
+actix-web.workspace = true
+actix-rt.workspace = true
+
 # 异步运行时
 tokio.workspace = true
 tokio-stream.workspace = true
