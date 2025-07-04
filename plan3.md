@@ -3,14 +3,15 @@
 ## 1. 项目概述
 
 ### 1.1 项目愿景
-构建一个基于Agent-to-Agent (A2A) 协议的通用AI Agent平台，采用Rust实现的微内核+插件架构，支持多种AI Agent框架（优先支持Mastra），实现跨平台、高性能、可扩展的AI Agent生态系统。
+构建一个基于Agent-to-Agent (A2A) 协议的通用AI Agent平台，采用Rust实现的微内核+gRPC插件架构，支持多种AI Agent框架的统一接入和互操作，实现跨平台、高性能、可扩展的AI Agent生态系统。
 
 ### 1.2 核心目标
-- **互操作性**: 基于A2A协议实现不同AI Agent框架间的无缝通信
-- **可扩展性**: 微内核+插件架构支持动态加载和扩展
-- **高性能**: Rust实现的零成本抽象和内存安全
-- **标准化**: 统一的Agent接口和通信协议
-- **生态兼容**: 优先支持Mastra，兼容MCP、ACP等协议
+- **框架无关性**: 支持任何AI Agent框架通过gRPC插件接入
+- **互操作性**: 基于A2A协议实现不同框架Agent间的无缝通信
+- **可扩展性**: 微内核+gRPC插件架构支持动态扩展
+- **高性能**: Rust微内核 + gRPC高性能通信
+- **标准化**: 统一的gRPC插件接口和A2A通信协议
+- **生态开放**: 平等支持所有主流AI Agent框架
 
 ## 2. 技术背景分析
 
@@ -31,21 +32,37 @@
 | MCP | 模型上下文 | JSON-RPC | 工具集成 |
 | ACP | 分层架构 | REST-native | 企业级应用 |
 
-### 2.2 Mastra框架分析
-**Mastra** 是TypeScript实现的Agent框架，具有以下特点：
+### 2.2 主流AI Agent框架分析
 
-#### 核心组件
-- **Agent系统**: 支持记忆、工具调用的智能Agent
-- **工作流引擎**: 图形化的确定性LLM调用流程
-- **RAG系统**: 检索增强生成，支持多种向量数据库
-- **集成生态**: 丰富的第三方服务集成
-- **开发环境**: 本地开发和调试工具
+#### 2.2.1 Mastra (TypeScript)
+- **特点**: 模块化Agent框架，支持工作流和RAG
+- **优势**: 完善的开发工具，丰富的集成
+- **接入方式**: Node.js gRPC插件 + TypeScript绑定
 
-#### 架构优势
-- 模块化设计，组件可独立使用
-- 统一的模型路由层（基于Vercel AI SDK）
-- 完善的内存管理和上下文维护
-- 强大的工具系统和MCP支持
+#### 2.2.2 LangChain (Python)
+- **特点**: 最流行的LLM应用框架，丰富的工具链
+- **优势**: 庞大的社区生态，广泛的模型支持
+- **接入方式**: Python gRPC插件
+
+#### 2.2.3 AutoGen (Python)
+- **特点**: 微软开源的多Agent对话框架
+- **优势**: 强大的多Agent协作能力
+- **接入方式**: Python gRPC插件
+
+#### 2.2.4 CrewAI (Python)
+- **特点**: 角色驱动的AI Agent框架
+- **优势**: 简单易用的多Agent编排
+- **接入方式**: Python gRPC插件
+
+#### 2.2.5 Semantic Kernel (C#/.NET)
+- **特点**: 微软的企业级AI编排框架
+- **优势**: 企业级功能，.NET生态集成
+- **接入方式**: C# gRPC插件
+
+#### 2.2.6 LangGraph (Python)
+- **特点**: LangChain的图形化工作流扩展
+- **优势**: 复杂工作流建模能力
+- **接入方式**: Python gRPC插件
 
 ### 2.3 微内核架构分析
 微内核架构将系统分为核心内核和可插拔的插件组件：
@@ -70,10 +87,16 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                    AgentX Platform                          │
 ├─────────────────────────────────────────────────────────────┤
-│  Plugin Layer (动态加载)                                     │
+│  gRPC Plugin Layer (进程隔离)                                │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────┐ │
-│  │ Mastra      │ │ LangChain   │ │ AutoGen     │ │ Custom  │ │
-│  │ Adapter     │ │ Adapter     │ │ Adapter     │ │ Plugins │ │
+│  │ Mastra      │ │ LangChain   │ │ AutoGen     │ │ CrewAI  │ │
+│  │ Plugin      │ │ Plugin      │ │ Plugin      │ │ Plugin  │ │
+│  │ (Node.js)   │ │ (Python)    │ │ (Python)    │ │ (Python)│ │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────┘ │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────┐ │
+│  │ Semantic    │ │ LangGraph   │ │ Custom      │ │ Future  │ │
+│  │ Kernel      │ │ Plugin      │ │ Framework   │ │ Plugins │ │
+│  │ (C#)        │ │ (Python)    │ │ Plugin      │ │         │ │
 │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────┘ │
 ├─────────────────────────────────────────────────────────────┤
 │  Core Services Layer                                        │
@@ -84,7 +107,7 @@
 ├─────────────────────────────────────────────────────────────┤
 │  Microkernel (Rust Core)                                   │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────┐ │
-│  │ Plugin      │ │ Event       │ │ Resource    │ │ Config  │ │
+│  │ gRPC Plugin │ │ Event       │ │ Resource    │ │ Config  │ │
 │  │ Manager     │ │ System      │ │ Manager     │ │ Manager │ │
 │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────┘ │
 └─────────────────────────────────────────────────────────────┘
@@ -371,63 +394,815 @@ GET /api/v1/plugins
 
 ## 6. 实现计划
 
-### 6.1 第一阶段：微内核基础 (4周)
-- [ ] Rust微内核框架搭建
-- [ ] 插件系统基础实现
-- [ ] 事件系统和消息路由
-- [ ] 配置管理和日志系统
+### 6.1 第一阶段：微内核基础 (5周)
+- [ ] **Week 1**: Rust微内核框架搭建
+  - [ ] 项目结构和基础依赖配置
+  - [ ] gRPC服务器和客户端基础框架
+  - [ ] Protocol Buffers定义和代码生成
+- [ ] **Week 2**: gRPC插件系统实现
+  - [ ] 插件进程管理器
+  - [ ] gRPC通信层实现
+  - [ ] 插件生命周期管理
+- [ ] **Week 3**: 事件系统和消息路由
+  - [ ] 异步事件系统设计
+  - [ ] 消息路由引擎
+  - [ ] 插件间通信机制
+- [ ] **Week 4**: 配置管理和监控
+  - [ ] 配置管理系统
+  - [ ] 日志系统集成
+  - [ ] 基础监控指标
+- [ ] **Week 5**: 插件SDK开发
+  - [ ] Rust插件SDK
+  - [ ] 插件开发工具链
+  - [ ] 基础测试框架
 
 ### 6.2 第二阶段：A2A协议实现 (6周)
-- [ ] A2A协议规范实现
-- [ ] HTTP/REST API服务器
-- [ ] Agent注册与发现机制
-- [ ] 消息路由和处理引擎
+- [ ] **Week 6-7**: A2A协议核心实现
+  - [ ] A2A消息格式和序列化
+  - [ ] 协议引擎核心逻辑
+  - [ ] gRPC到A2A的消息转换
+- [ ] **Week 8-9**: HTTP/REST API服务器
+  - [ ] Axum Web服务器搭建
+  - [ ] RESTful API接口实现
+  - [ ] API文档和OpenAPI规范
+- [ ] **Week 10-11**: Agent注册与发现
+  - [ ] Agent注册中心实现
+  - [ ] 服务发现机制
+  - [ ] 健康检查和故障转移
 
-### 6.3 第三阶段：Mastra集成 (4周)
-- [ ] Mastra适配器插件开发
-- [ ] TypeScript/Rust FFI桥接
-- [ ] Mastra Agent代理实现
-- [ ] 工具和工作流集成
+### 6.3 第三阶段：Mastra集成 (5周)
+- [ ] **Week 12-13**: Mastra适配器插件开发
+  - [ ] Mastra gRPC插件框架
+  - [ ] Node.js到Rust的FFI桥接
+  - [ ] Mastra Agent包装器
+- [ ] **Week 14-15**: 深度集成实现
+  - [ ] Mastra工具系统集成
+  - [ ] 工作流引擎适配
+  - [ ] 内存管理系统对接
+- [ ] **Week 16**: 测试和优化
+  - [ ] 集成测试套件
+  - [ ] 性能基准测试
+  - [ ] 错误处理和恢复
 
 ### 6.4 第四阶段：扩展功能 (6周)
-- [ ] 安全认证和权限控制
-- [ ] 监控和可观测性
-- [ ] 性能优化和压力测试
-- [ ] 文档和示例应用
+- [ ] **Week 17-18**: 安全认证和权限控制
+  - [ ] JWT认证系统
+  - [ ] RBAC权限模型
+  - [ ] TLS加密通信
+- [ ] **Week 19-20**: 监控和可观测性
+  - [ ] Prometheus指标集成
+  - [ ] 分布式追踪系统
+  - [ ] 日志聚合和分析
+- [ ] **Week 21-22**: 性能优化和压力测试
+  - [ ] 零拷贝消息传递优化
+  - [ ] 连接池和缓存优化
+  - [ ] 大规模压力测试
 
 ### 6.5 第五阶段：生态扩展 (8周)
-- [ ] 其他框架适配器（LangChain、AutoGen等）
-- [ ] MCP协议兼容层
-- [ ] 云原生部署支持
-- [ ] 社区工具和插件市场
+- [ ] **Week 23-24**: 多语言插件SDK
+  - [ ] Go插件SDK开发
+  - [ ] Python插件SDK开发
+  - [ ] Node.js插件SDK开发
+- [ ] **Week 25-26**: 其他框架适配器
+  - [ ] LangChain适配器插件
+  - [ ] AutoGen适配器插件
+  - [ ] 自定义框架适配器模板
+- [ ] **Week 27-28**: 协议兼容和云部署
+  - [ ] MCP协议兼容层
+  - [ ] Kubernetes Operator开发
+  - [ ] 云原生部署支持
+- [ ] **Week 29-30**: 社区工具和文档
+  - [ ] 插件市场和注册中心
+  - [ ] 开发者文档和教程
+  - [ ] 示例应用和最佳实践
 
-## 7. 技术栈选择
+## 7. gRPC插件系统优势分析
 
-### 7.1 核心技术栈
-- **语言**: Rust (微内核) + TypeScript (Mastra集成)
+### 7.1 与传统动态加载的对比
+
+| 特性 | 传统动态加载 | gRPC插件系统 |
+|------|-------------|-------------|
+| **进程隔离** | 同进程，共享内存空间 | 独立进程，完全隔离 |
+| **故障影响** | 插件崩溃影响整个系统 | 插件崩溃不影响核心系统 |
+| **内存安全** | 插件内存错误可能影响核心 | 完全的内存隔离 |
+| **语言支持** | 受限于FFI兼容性 | 支持任何支持gRPC的语言 |
+| **版本管理** | 复杂的ABI兼容性问题 | 通过Protocol Buffers版本控制 |
+| **调试难度** | 调试复杂，难以定位问题 | 独立进程，易于调试 |
+| **部署复杂度** | 需要处理动态库依赖 | 独立可执行文件，简化部署 |
+| **性能开销** | 函数调用开销小 | 网络通信开销，但可接受 |
+| **扩展性** | 受限于单机资源 | 可分布式部署 |
+| **安全性** | 插件可访问核心内存 | 网络层安全控制 |
+
+### 7.2 gRPC插件系统的核心优势
+
+#### 7.2.1 进程级隔离
+```rust
+// 传统动态加载的风险
+unsafe {
+    let lib = Library::new("plugin.so")?;
+    let func: Symbol<fn()> = lib.get(b"plugin_function")?;
+    func(); // 可能导致整个进程崩溃
+}
+
+// gRPC插件的安全性
+async fn call_plugin(client: &mut PluginClient) -> Result<Response, Status> {
+    // 即使插件进程崩溃，核心系统仍然安全运行
+    match client.handle_message(request).await {
+        Ok(response) => Ok(response),
+        Err(status) => {
+            // 插件不可用，但系统继续运行
+            log::warn!("Plugin unavailable: {}", status);
+            Err(status)
+        }
+    }
+}
+```
+
+#### 7.2.2 多语言生态支持
+```bash
+# 同一个AgentX平台可以同时运行多种语言的插件
+├── plugins/
+│   ├── mastra-adapter/          # Rust + Node.js
+│   ├── langchain-adapter/       # Python
+│   ├── autogen-adapter/         # Python
+│   ├── custom-go-plugin/        # Go
+│   ├── java-enterprise-plugin/  # Java
+│   └── dotnet-plugin/           # C#
+```
+
+#### 7.2.3 版本兼容性管理
+```protobuf
+// Protocol Buffers提供向前和向后兼容性
+syntax = "proto3";
+
+// v1.0版本
+message A2AMessage {
+    string id = 1;
+    string from = 2;
+    string to = 3;
+    Intent intent = 4;
+    MessagePayload payload = 5;
+}
+
+// v1.1版本 - 向后兼容
+message A2AMessage {
+    string id = 1;
+    string from = 2;
+    string to = 3;
+    Intent intent = 4;
+    MessagePayload payload = 5;
+    map<string, string> metadata = 6;  // 新增字段
+    int64 timestamp = 7;               // 新增字段
+}
+```
+
+#### 7.2.4 分布式部署能力
+```yaml
+# 插件可以部署在不同的节点上
+apiVersion: v1
+kind: Service
+metadata:
+  name: mastra-plugin-cluster
+spec:
+  selector:
+    app: mastra-plugin
+  ports:
+  - port: 50051
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mastra-plugin
+spec:
+  replicas: 5  # 多实例部署
+  selector:
+    matchLabels:
+      app: mastra-plugin
+  template:
+    spec:
+      containers:
+      - name: mastra-plugin
+        image: agentx/mastra-plugin:1.0.0
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+```
+
+#### 7.2.5 健壮的错误处理
+```rust
+pub struct PluginHealthMonitor {
+    plugins: Arc<RwLock<HashMap<String, PluginHealth>>>,
+}
+
+impl PluginHealthMonitor {
+    pub async fn monitor_plugin(&self, plugin_id: String, mut client: PluginServiceClient<Channel>) {
+        let mut interval = tokio::time::interval(Duration::from_secs(30));
+
+        loop {
+            interval.tick().await;
+
+            match client.health_check(Request::new(HealthCheckRequest {})).await {
+                Ok(response) => {
+                    let health = response.into_inner();
+                    if health.status == health_check_response::Status::Serving as i32 {
+                        self.mark_healthy(&plugin_id).await;
+                    } else {
+                        self.mark_unhealthy(&plugin_id).await;
+                    }
+                }
+                Err(status) => {
+                    log::warn!("Plugin {} health check failed: {}", plugin_id, status);
+                    self.mark_unhealthy(&plugin_id).await;
+
+                    // 尝试重启插件
+                    if let Err(e) = self.restart_plugin(&plugin_id).await {
+                        log::error!("Failed to restart plugin {}: {}", plugin_id, e);
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+### 7.3 性能考虑和优化
+
+#### 7.3.1 gRPC性能优化
+```rust
+// 连接复用和池化
+pub struct PluginConnectionPool {
+    pools: HashMap<String, Pool<PluginServiceClient<Channel>>>,
+}
+
+// 流式处理减少延迟
+pub async fn handle_message_stream(
+    &self,
+    mut stream: tonic::Streaming<HandleMessageRequest>,
+) -> Result<Response<tonic::codec::Streaming<HandleMessageResponse>>, Status> {
+    let (tx, rx) = mpsc::channel(100);
+
+    tokio::spawn(async move {
+        while let Some(request) = stream.next().await {
+            match request {
+                Ok(req) => {
+                    let response = process_message(req).await;
+                    if tx.send(Ok(response)).await.is_err() {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e)).await;
+                    break;
+                }
+            }
+        }
+    });
+
+    Ok(Response::new(ReceiverStream::new(rx)))
+}
+```
+
+#### 7.3.2 消息序列化优化
+```rust
+// 使用零拷贝序列化
+use prost::Message;
+use bytes::{Bytes, BytesMut};
+
+pub fn serialize_message_zero_copy(message: &A2AMessage) -> Result<Bytes, EncodeError> {
+    let mut buf = BytesMut::with_capacity(message.encoded_len());
+    message.encode(&mut buf)?;
+    Ok(buf.freeze())
+}
+
+// 消息压缩
+use tonic::codec::CompressionEncoding;
+
+let client = PluginServiceClient::new(channel)
+    .send_compressed(CompressionEncoding::Gzip)
+    .accept_compressed(CompressionEncoding::Gzip);
+```
+
+## 8. 技术栈选择
+
+### 8.1 核心技术栈
+- **语言**: Rust (微内核) + 多语言插件支持
 - **异步运行时**: Tokio
-- **Web框架**: Axum
-- **序列化**: Serde
+- **Web框架**: Axum (REST API)
+- **RPC框架**: Tonic (gRPC)
+- **序列化**: Protocol Buffers + Serde
 - **数据库**: PostgreSQL + Redis
 - **消息队列**: Apache Kafka / RabbitMQ
+- **进程管理**: Tokio Process
+- **服务发现**: Consul / etcd
 
-### 7.2 插件开发
-- **动态加载**: libloading
-- **FFI**: 支持C/C++/Python/JavaScript插件
-- **WASM**: WebAssembly插件支持
-- **容器化**: Docker插件隔离
+### 8.2 插件开发
 
-### 7.3 部署和运维
+#### gRPC插件开发框架
+- **gRPC通信**: 基于Protocol Buffers的高性能通信
+- **进程隔离**: 每个插件运行在独立进程中
+- **多语言支持**: 支持Rust、Go、Python、Node.js等
+- **标准化接口**: 统一的gRPC服务接口
+
+#### 插件开发SDK
+
+**Rust插件开发**
+```rust
+// Cargo.toml
+[package]
+name = "mastra-plugin"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+agentx-plugin-sdk = "0.1.0"
+tokio = { version = "1.0", features = ["full"] }
+tonic = "0.10"
+prost = "0.12"
+
+// src/main.rs
+use agentx_plugin_sdk::{PluginBuilder, PluginResult, A2AMessage, MessagePayload};
+use tonic::{Request, Response, Status};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let plugin = MastraPlugin::new();
+
+    PluginBuilder::new("mastra-plugin", "1.0.0")
+        .with_capabilities(vec!["text-generation", "tool-calling"])
+        .with_framework("mastra")
+        .with_handler(plugin)
+        .serve()
+        .await?;
+
+    Ok(())
+}
+
+struct MastraPlugin {
+    // Mastra集成逻辑
+}
+
+impl MastraPlugin {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait::async_trait]
+impl agentx_plugin_sdk::PluginHandler for MastraPlugin {
+    async fn initialize(&mut self, config: std::collections::HashMap<String, String>) -> PluginResult<()> {
+        // 初始化Mastra Agent
+        println!("Initializing Mastra plugin with config: {:?}", config);
+        Ok(())
+    }
+
+    async fn handle_message(&self, message: A2AMessage) -> PluginResult<A2AMessage> {
+        // 处理A2A消息，转发给Mastra Agent
+        match message.payload {
+            MessagePayload::Text(text) => {
+                // 调用Mastra Agent处理
+                let response_text = self.process_with_mastra(&text).await?;
+
+                Ok(A2AMessage {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    from: message.to,
+                    to: message.from,
+                    intent: message.intent,
+                    payload: MessagePayload::Text(response_text),
+                    metadata: message.metadata,
+                    timestamp: chrono::Utc::now(),
+                })
+            }
+            _ => Err("Unsupported message type".into()),
+        }
+    }
+
+    async fn shutdown(&mut self) -> PluginResult<()> {
+        println!("Shutting down Mastra plugin");
+        Ok(())
+    }
+
+    async fn get_capabilities(&self) -> Vec<String> {
+        vec!["text-generation".to_string(), "tool-calling".to_string()]
+    }
+}
+
+impl MastraPlugin {
+    async fn process_with_mastra(&self, input: &str) -> PluginResult<String> {
+        // 这里集成实际的Mastra逻辑
+        // 可以通过FFI调用Node.js中的Mastra代码
+        Ok(format!("Mastra processed: {}", input))
+    }
+}
+```
+
+**Go插件开发**
+```go
+// go.mod
+module mastra-plugin-go
+
+go 1.21
+
+require (
+    github.com/agentx/plugin-sdk-go v0.1.0
+    google.golang.org/grpc v1.58.0
+    google.golang.org/protobuf v1.31.0
+)
+
+// main.go
+package main
+
+import (
+    "context"
+    "log"
+
+    "github.com/agentx/plugin-sdk-go/pkg/plugin"
+    "github.com/agentx/plugin-sdk-go/pkg/proto"
+)
+
+type MastraPlugin struct {
+    // Mastra集成逻辑
+}
+
+func (p *MastraPlugin) Initialize(ctx context.Context, config map[string]string) error {
+    log.Printf("Initializing Mastra Go plugin with config: %v", config)
+    return nil
+}
+
+func (p *MastraPlugin) HandleMessage(ctx context.Context, msg *proto.A2AMessage) (*proto.A2AMessage, error) {
+    // 处理消息逻辑
+    response := &proto.A2AMessage{
+        Id:     generateUUID(),
+        From:   msg.To,
+        To:     msg.From,
+        Intent: msg.Intent,
+        Payload: &proto.MessagePayload{
+            Content: &proto.MessagePayload_Text{
+                Text: "Go plugin processed: " + msg.GetPayload().GetText(),
+            },
+        },
+        Metadata:  msg.Metadata,
+        Timestamp: time.Now().Unix(),
+    }
+
+    return response, nil
+}
+
+func (p *MastraPlugin) Shutdown(ctx context.Context) error {
+    log.Println("Shutting down Mastra Go plugin")
+    return nil
+}
+
+func (p *MastraPlugin) GetCapabilities() []string {
+    return []string{"text-generation", "tool-calling"}
+}
+
+func main() {
+    plugin := &MastraPlugin{}
+
+    server := plugin.NewPluginServer("mastra-plugin-go", "1.0.0", plugin)
+
+    if err := server.Serve(); err != nil {
+        log.Fatalf("Failed to serve plugin: %v", err)
+    }
+}
+```
+
+**Python插件开发**
+```python
+# requirements.txt
+agentx-plugin-sdk==0.1.0
+grpcio==1.58.0
+grpcio-tools==1.58.0
+
+# main.py
+import asyncio
+import logging
+from typing import Dict, List
+from agentx_plugin_sdk import PluginBuilder, A2AMessage, MessagePayload
+
+class MastraPlugin:
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
+    async def initialize(self, config: Dict[str, str]) -> None:
+        self.logger.info(f"Initializing Mastra Python plugin with config: {config}")
+
+    async def handle_message(self, message: A2AMessage) -> A2AMessage:
+        # 处理消息逻辑
+        if isinstance(message.payload, MessagePayload.Text):
+            response_text = await self.process_with_mastra(message.payload.text)
+
+            return A2AMessage(
+                id=str(uuid.uuid4()),
+                from_=message.to,
+                to=message.from_,
+                intent=message.intent,
+                payload=MessagePayload.Text(response_text),
+                metadata=message.metadata,
+                timestamp=datetime.utcnow()
+            )
+
+        raise ValueError("Unsupported message type")
+
+    async def shutdown(self) -> None:
+        self.logger.info("Shutting down Mastra Python plugin")
+
+    def get_capabilities(self) -> List[str]:
+        return ["text-generation", "tool-calling"]
+
+    async def process_with_mastra(self, input_text: str) -> str:
+        # 这里集成实际的Mastra逻辑
+        return f"Python Mastra processed: {input_text}"
+
+async def main():
+    plugin = MastraPlugin()
+
+    builder = PluginBuilder("mastra-plugin-python", "1.0.0")
+    builder.with_capabilities(["text-generation", "tool-calling"])
+    builder.with_framework("mastra")
+    builder.with_handler(plugin)
+
+    await builder.serve()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+#### 插件构建工具
+
+**AgentX CLI插件命令**
+```bash
+# 创建新插件项目
+agentx plugin new --name my-plugin --language rust --framework mastra
+
+# 构建插件
+agentx plugin build --target release
+
+# 测试插件
+agentx plugin test --config test-config.yaml
+
+# 发布插件
+agentx plugin publish --registry https://plugins.agentx.dev
+
+# 安装插件
+agentx plugin install mastra-adapter@1.0.0
+
+# 列出已安装插件
+agentx plugin list
+
+# 启动插件开发服务器
+agentx plugin dev --watch
+```
+
+#### 插件配置文件
+
+**plugin.yaml**
+```yaml
+# 插件元数据
+metadata:
+  name: "mastra-adapter"
+  version: "1.0.0"
+  description: "Mastra framework adapter for AgentX"
+  author: "AgentX Team"
+  license: "Apache-2.0"
+  homepage: "https://github.com/agentx/mastra-adapter"
+
+# 插件能力
+capabilities:
+  - "text-generation"
+  - "tool-calling"
+  - "memory-management"
+  - "workflow-execution"
+
+# 支持的框架
+framework: "mastra"
+
+# 运行时配置
+runtime:
+  language: "rust"
+  executable: "./target/release/mastra-plugin"
+  grpc_port: 0  # 0表示自动分配
+  health_check_interval: 30s
+  startup_timeout: 10s
+  shutdown_timeout: 5s
+
+# 环境变量
+environment:
+  MASTRA_API_KEY: "${MASTRA_API_KEY}"
+  LOG_LEVEL: "info"
+  RUST_LOG: "debug"
+
+# 资源限制
+resources:
+  memory_limit: "512MB"
+  cpu_limit: "0.5"
+  disk_limit: "1GB"
+
+# 依赖项
+dependencies:
+  - name: "nodejs"
+    version: ">=18.0.0"
+    optional: false
+  - name: "mastra"
+    version: ">=1.0.0"
+    optional: false
+
+# 配置模式
+config_schema:
+  type: "object"
+  properties:
+    mastra_config:
+      type: "object"
+      properties:
+        model_provider:
+          type: "string"
+          enum: ["openai", "anthropic", "google"]
+          default: "openai"
+        api_key:
+          type: "string"
+          description: "API key for the model provider"
+        temperature:
+          type: "number"
+          minimum: 0.0
+          maximum: 2.0
+          default: 0.7
+      required: ["api_key"]
+  required: ["mastra_config"]
+
+# 健康检查
+health_check:
+  enabled: true
+  endpoint: "/health"
+  interval: "30s"
+  timeout: "5s"
+  retries: 3
+
+# 日志配置
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout"
+  rotation:
+    enabled: true
+    max_size: "100MB"
+    max_files: 10
+```
+
+#### 插件部署配置
+
+**Docker化插件**
+```dockerfile
+# Dockerfile.mastra-plugin
+FROM node:18-alpine AS node-base
+
+# 安装Mastra依赖
+WORKDIR /app/mastra
+COPY package.json package-lock.json ./
+RUN npm ci --only=production
+
+FROM rust:1.75 AS rust-builder
+
+# 构建Rust插件
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+COPY proto ./proto
+RUN cargo build --release
+
+FROM alpine:latest
+
+# 安装运行时依赖
+RUN apk add --no-cache nodejs npm ca-certificates
+
+# 复制Node.js依赖
+COPY --from=node-base /app/mastra /app/mastra
+
+# 复制Rust二进制文件
+COPY --from=rust-builder /app/target/release/mastra-plugin /usr/local/bin/
+
+# 复制配置文件
+COPY plugin.yaml /etc/agentx/plugin.yaml
+
+# 设置环境变量
+ENV AGENTX_PLUGIN_CONFIG=/etc/agentx/plugin.yaml
+ENV NODE_PATH=/app/mastra/node_modules
+
+# 暴露gRPC端口
+EXPOSE 50051
+
+# 启动插件
+CMD ["mastra-plugin"]
+```
+
+**Kubernetes部署**
+```yaml
+# k8s/mastra-plugin.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mastra-plugin
+  labels:
+    app: mastra-plugin
+    component: agentx-plugin
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mastra-plugin
+  template:
+    metadata:
+      labels:
+        app: mastra-plugin
+    spec:
+      containers:
+      - name: mastra-plugin
+        image: agentx/mastra-plugin:1.0.0
+        ports:
+        - containerPort: 50051
+          name: grpc
+        env:
+        - name: AGENTX_CORE_ADDRESS
+          value: "agentx-core:8080"
+        - name: MASTRA_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: mastra-secrets
+              key: api-key
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          grpc:
+            port: 50051
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          grpc:
+            port: 50051
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: plugin-config
+          mountPath: /etc/agentx
+          readOnly: true
+      volumes:
+      - name: plugin-config
+        configMap:
+          name: mastra-plugin-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mastra-plugin-service
+spec:
+  selector:
+    app: mastra-plugin
+  ports:
+  - protocol: TCP
+    port: 50051
+    targetPort: 50051
+    name: grpc
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mastra-plugin-config
+data:
+  plugin.yaml: |
+    metadata:
+      name: "mastra-adapter"
+      version: "1.0.0"
+    capabilities:
+      - "text-generation"
+      - "tool-calling"
+    framework: "mastra"
+    runtime:
+      language: "rust"
+      grpc_port: 50051
+```
+
+### 8.3 部署和运维
 - **容器化**: Docker + Kubernetes
-- **监控**: Prometheus + Grafana
-- **日志**: ELK Stack
-- **CI/CD**: GitHub Actions
+- **服务网格**: Istio (gRPC流量管理)
+- **监控**: Prometheus + Grafana + Jaeger
+- **日志**: ELK Stack + gRPC访问日志
+- **CI/CD**: GitHub Actions + 插件自动构建
+- **插件注册**: Harbor + 插件镜像仓库
 
-## 8. 性能和可扩展性
+## 9. 性能和可扩展性
 
-### 8.1 性能目标
-- **延迟**: 消息路由延迟 < 10ms
+### 9.1 性能目标
+- **gRPC延迟**: 插件通信延迟 < 5ms
+- **消息路由延迟**: A2A消息路由 < 10ms
 - **吞吐量**: 支持10,000+ 并发Agent
+- **插件启动时间**: < 3秒
+- **插件故障恢复**: < 1秒
 - **可用性**: 99.9% 系统可用性
 - **扩展性**: 水平扩展支持
 
@@ -1512,10 +2287,22 @@ AgentX项目通过构建基于A2A协议的通用AI Agent平台，解决了当前
 - **扩展困难**: 架构限制了系统扩展
 
 ### 20.2 技术创新
-- **微内核架构**: 首个基于微内核的AI Agent平台
+- **gRPC插件架构**: 首个基于gRPC的AI Agent插件系统
+  - 进程级隔离保证系统稳定性
+  - 多语言生态支持
+  - 分布式部署能力
 - **A2A协议实现**: 完整的A2A协议Rust实现
-- **多框架支持**: 统一平台支持多种AI框架
-- **高性能设计**: Rust实现的零成本抽象
+  - 标准化的Agent间通信
+  - 高性能消息路由
+- **微内核设计**: 最小化核心，最大化扩展性
+  - 插件热插拔支持
+  - 故障隔离和自动恢复
+- **多框架统一**: 统一平台支持多种AI框架
+  - Mastra深度集成
+  - LangChain、AutoGen等适配
+- **云原生架构**: 为云环境优化的设计
+  - Kubernetes原生支持
+  - 水平扩展能力
 
 ### 20.3 商业前景
 - **市场需求**: AI Agent市场快速增长
