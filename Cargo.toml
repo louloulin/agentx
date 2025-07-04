@@ -1,0 +1,64 @@
+[workspace]
+members = [
+    "crates/agentx-core",
+    "crates/agentx-a2a",
+    "crates/agentx-plugin",
+    "crates/agentx-grpc",
+    "crates/agentx-registry",
+    "crates/agentx-router",
+    "crates/agentx-server",
+    "examples/basic-plugin",
+    "examples/langchain-plugin",
+    "examples/mastra-plugin"
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["AgentX Team"]
+license = "Apache-2.0"
+repository = "https://github.com/agentx/agentx"
+
+[workspace.dependencies]
+# 异步运行时
+tokio = { version = "1.0", features = ["full"] }
+tokio-stream = "0.1"
+
+# gRPC和序列化
+tonic = "0.10"
+prost = "0.12"
+prost-types = "0.12"
+
+# 序列化和JSON
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 错误处理
+anyhow = "1.0"
+thiserror = "1.0"
+
+# 日志
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# 时间处理
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID生成
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# 异步trait
+async-trait = "0.1"
+
+# 配置管理
+config = "0.14"
+
+# 数据库
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
+redis = { version = "0.24", features = ["tokio-comp"] }
+
+# HTTP客户端
+reqwest = { version = "0.11", features = ["json"] }
+
+# 测试
+mockall = "0.12"

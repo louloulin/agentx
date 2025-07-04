@@ -1,0 +1,44 @@
+[package]
+name = "agentx-router"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+# Core dependencies
+agentx-a2a = { path = "../agentx-a2a" }
+
+# 异步运行时
+tokio.workspace = true
+tokio-stream.workspace = true
+
+# 序列化
+serde.workspace = true
+serde_json.workspace = true
+
+# 错误处理
+anyhow.workspace = true
+thiserror.workspace = true
+
+# 日志
+tracing.workspace = true
+
+# 时间处理
+chrono.workspace = true
+
+# UUID生成
+uuid.workspace = true
+
+# 异步trait
+async-trait.workspace = true
+
+# HTTP客户端
+reqwest.workspace = true
+
+# 数据库
+redis.workspace = true
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall.workspace = true
