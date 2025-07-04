@@ -492,64 +492,302 @@ GET /api/v1/plugins
 
 ### 12.1 微内核核心实现
 
-#### 插件管理器
+#### 基于gRPC的插件管理器
 ```rust
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use libloading::{Library, Symbol};
+use std::process::{Command, Child, Stdio};
 use tokio::sync::mpsc;
+use tonic::{transport::Channel, Request, Response, Status};
+use uuid::Uuid;
 
-pub struct PluginManager {
-    plugins: Arc<RwLock<HashMap<String, LoadedPlugin>>>,
-    event_tx: mpsc::UnboundedSender<PluginEvent>,
+// 生成的gRPC代码
+pub mod plugin_proto {
+    tonic::include_proto!("agentx.plugin");
 }
 
-pub struct LoadedPlugin {
-    library: Library,
-    instance: Box<dyn AgentPlugin>,
+use plugin_proto::{
+    plugin_service_client::PluginServiceClient,
+    agent_service_server::{AgentService, AgentServiceServer},
+    *,
+};
+
+pub struct PluginManager {
+    plugins: Arc<RwLock<HashMap<String, PluginProcess>>>,
+    event_tx: mpsc::UnboundedSender<PluginEvent>,
+    grpc_port_range: (u16, u16),
+}
+
+pub struct PluginProcess {
+    id: String,
+    name: String,
+    process: Child,
+    client: PluginServiceClient<Channel>,
+    grpc_port: u16,
     metadata: PluginMetadata,
+    last_health_check: std::time::Instant,
 }
 
 impl PluginManager {
-    pub async fn load_plugin(&self, path: &str, config: PluginConfig) -> Result<String, PluginError> {
-        // 动态加载插件库
-        let library = unsafe { Library::new(path)? };
+    pub fn new(grpc_port_range: (u16, u16)) -> Self {
+        let (event_tx, _) = mpsc::unbounded_channel();
+        Self {
+            plugins: Arc::new(RwLock::new(HashMap::new())),
+            event_tx,
+            grpc_port_range,
+        }
+    }
 
-        // 获取插件创建函数
-        let create_plugin: Symbol<fn() -> Box<dyn AgentPlugin>> =
-            unsafe { library.get(b"create_plugin")? };
+    pub async fn load_plugin(&self, executable_path: &str, config: PluginConfig) -> Result<String, PluginError> {
+        let plugin_id = Uuid::new_v4().to_string();
+        let grpc_port = self.find_available_port().await?;
 
-        // 创建插件实例
-        let mut plugin = create_plugin();
+        // 启动插件进程
+        let mut process = Command::new(executable_path)
+            .env("AGENTX_PLUGIN_ID", &plugin_id)
+            .env("AGENTX_GRPC_PORT", grpc_port.to_string())
+            .env("AGENTX_CORE_ADDRESS", format!("127.0.0.1:{}", self.get_core_port()))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+
+        // 等待插件启动
+        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+
+        // 建立gRPC连接
+        let channel = Channel::from_shared(format!("http://127.0.0.1:{}", grpc_port))?
+            .connect()
+            .await?;
+
+        let mut client = PluginServiceClient::new(channel);
 
         // 初始化插件
-        let context = PluginContext::new(config);
-        plugin.initialize(&context)?;
+        let init_request = Request::new(InitializeRequest {
+            config: config.into_map(),
+            plugin_id: plugin_id.clone(),
+        });
 
-        // 注册插件
-        let plugin_id = uuid::Uuid::new_v4().to_string();
-        let loaded_plugin = LoadedPlugin {
-            library,
-            instance: plugin,
-            metadata: PluginMetadata::from_config(&config),
+        let response = client.initialize(init_request).await?;
+        if !response.into_inner().success {
+            process.kill()?;
+            return Err(PluginError::InitializationFailed);
+        }
+
+        // 获取插件信息
+        let info_response = client.get_info(Request::new(GetInfoRequest {})).await?;
+        let info = info_response.into_inner();
+
+        let plugin_process = PluginProcess {
+            id: plugin_id.clone(),
+            name: info.name.clone(),
+            process,
+            client,
+            grpc_port,
+            metadata: PluginMetadata {
+                name: info.name,
+                version: info.version,
+                capabilities: info.capabilities,
+                framework: info.framework,
+                metadata: info.metadata,
+            },
+            last_health_check: std::time::Instant::now(),
         };
 
-        self.plugins.write().unwrap().insert(plugin_id.clone(), loaded_plugin);
+        self.plugins.write().unwrap().insert(plugin_id.clone(), plugin_process);
 
         // 发送插件加载事件
         self.event_tx.send(PluginEvent::Loaded(plugin_id.clone()))?;
+
+        // 启动健康检查
+        self.start_health_check(plugin_id.clone()).await;
 
         Ok(plugin_id)
     }
 
     pub async fn unload_plugin(&self, plugin_id: &str) -> Result<(), PluginError> {
         let mut plugins = self.plugins.write().unwrap();
-        if let Some(mut plugin) = plugins.remove(plugin_id) {
-            plugin.instance.shutdown()?;
+        if let Some(mut plugin_process) = plugins.remove(plugin_id) {
+            // 发送关闭请求
+            let shutdown_request = Request::new(ShutdownRequest {});
+            let _ = plugin_process.client.shutdown(shutdown_request).await;
+
+            // 强制终止进程
+            let _ = plugin_process.process.kill();
+
+            // 发送插件卸载事件
             self.event_tx.send(PluginEvent::Unloaded(plugin_id.to_string()))?;
         }
         Ok(())
     }
+
+    pub async fn send_message_to_plugin(&self, plugin_id: &str, message: A2AMessage) -> Result<A2AMessage, PluginError> {
+        let plugins = self.plugins.read().unwrap();
+        if let Some(plugin) = plugins.get(plugin_id) {
+            let mut client = plugin.client.clone();
+
+            let request = Request::new(HandleMessageRequest {
+                message: Some(self.convert_to_proto_message(message)),
+            });
+
+            let response = client.handle_message(request).await?;
+            let proto_response = response.into_inner();
+
+            if proto_response.success {
+                if let Some(response_message) = proto_response.response {
+                    return Ok(self.convert_from_proto_message(response_message));
+                }
+            }
+
+            Err(PluginError::MessageHandlingFailed(proto_response.error))
+        } else {
+            Err(PluginError::PluginNotFound(plugin_id.to_string()))
+        }
+    }
+
+    pub async fn list_plugins(&self) -> Vec<PluginMetadata> {
+        let plugins = self.plugins.read().unwrap();
+        plugins.values().map(|p| p.metadata.clone()).collect()
+    }
+
+    async fn start_health_check(&self, plugin_id: String) {
+        let plugins = self.plugins.clone();
+        let event_tx = self.event_tx.clone();
+
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+
+            loop {
+                interval.tick().await;
+
+                let should_continue = {
+                    let mut plugins_guard = plugins.write().unwrap();
+                    if let Some(plugin) = plugins_guard.get_mut(&plugin_id) {
+                        let mut client = plugin.client.clone();
+
+                        match client.health_check(Request::new(HealthCheckRequest {})).await {
+                            Ok(response) => {
+                                let health = response.into_inner();
+                                plugin.last_health_check = std::time::Instant::now();
+
+                                if health.status != health_check_response::Status::Serving as i32 {
+                                    // 插件不健康，移除它
+                                    let _ = event_tx.send(PluginEvent::Unhealthy(plugin_id.clone()));
+                                    plugins_guard.remove(&plugin_id);
+                                    false
+                                } else {
+                                    true
+                                }
+                            }
+                            Err(_) => {
+                                // 健康检查失败，移除插件
+                                let _ = event_tx.send(PluginEvent::Unhealthy(plugin_id.clone()));
+                                plugins_guard.remove(&plugin_id);
+                                false
+                            }
+                        }
+                    } else {
+                        false
+                    }
+                };
+
+                if !should_continue {
+                    break;
+                }
+            }
+        });
+    }
+
+    async fn find_available_port(&self) -> Result<u16, PluginError> {
+        for port in self.grpc_port_range.0..=self.grpc_port_range.1 {
+            if self.is_port_available(port).await {
+                return Ok(port);
+            }
+        }
+        Err(PluginError::NoAvailablePort)
+    }
+
+    async fn is_port_available(&self, port: u16) -> bool {
+        tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port))
+            .await
+            .is_ok()
+    }
+
+    fn get_core_port(&self) -> u16 {
+        // 返回核心服务的gRPC端口
+        8080
+    }
+
+    fn convert_to_proto_message(&self, message: A2AMessage) -> plugin_proto::A2aMessage {
+        // 转换消息格式
+        plugin_proto::A2aMessage {
+            id: message.id,
+            from: message.from.to_string(),
+            to: message.to.to_string(),
+            intent: message.intent as i32,
+            payload: Some(plugin_proto::MessagePayload {
+                content: Some(match message.payload {
+                    MessagePayload::Text(text) => plugin_proto::message_payload::Content::Text(text),
+                    MessagePayload::Binary(data) => plugin_proto::message_payload::Content::Binary(data),
+                    MessagePayload::Json(json) => plugin_proto::message_payload::Content::Json(json),
+                }),
+            }),
+            metadata: message.metadata,
+            timestamp: message.timestamp.timestamp(),
+        }
+    }
+
+    fn convert_from_proto_message(&self, proto_message: plugin_proto::A2aMessage) -> A2AMessage {
+        // 从proto消息转换
+        A2AMessage {
+            id: proto_message.id,
+            from: AgentId::new(&proto_message.from),
+            to: AgentId::new(&proto_message.to),
+            intent: Intent::from_i32(proto_message.intent).unwrap_or(Intent::Query),
+            payload: if let Some(payload) = proto_message.payload {
+                match payload.content {
+                    Some(plugin_proto::message_payload::Content::Text(text)) => MessagePayload::Text(text),
+                    Some(plugin_proto::message_payload::Content::Binary(data)) => MessagePayload::Binary(data),
+                    Some(plugin_proto::message_payload::Content::Json(json)) => MessagePayload::Json(json),
+                    None => MessagePayload::Text(String::new()),
+                }
+            } else {
+                MessagePayload::Text(String::new())
+            },
+            metadata: proto_message.metadata,
+            timestamp: chrono::DateTime::from_timestamp(proto_message.timestamp, 0)
+                .unwrap_or_else(|| chrono::Utc::now()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum PluginEvent {
+    Loaded(String),
+    Unloaded(String),
+    Unhealthy(String),
+    MessageReceived(String, A2AMessage),
+    MessageSent(String, A2AMessage),
+}
+
+#[derive(Debug, Clone)]
+pub struct PluginMetadata {
+    pub name: String,
+    pub version: String,
+    pub capabilities: Vec<String>,
+    pub framework: String,
+    pub metadata: HashMap<String, String>,
+}
+
+#[derive(Debug)]
+pub enum PluginError {
+    ProcessSpawnFailed(std::io::Error),
+    GrpcConnectionFailed(tonic::transport::Error),
+    InitializationFailed,
+    MessageHandlingFailed(String),
+    PluginNotFound(String),
+    NoAvailablePort,
+    HealthCheckFailed,
 }
 ```
 
