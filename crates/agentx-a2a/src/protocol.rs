@@ -322,6 +322,7 @@ impl Default for ProtocolConfig {
             validate_messages: true,
             cache_capabilities: true,
             rate_limit: None,
+            handler_pool_size: Some(10),   // Default pool size
         }
     }
 }

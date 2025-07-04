@@ -1,15 +1,7 @@
 [workspace]
 members = [
-    "crates/agentx-core",
     "crates/agentx-a2a",
-    "crates/agentx-plugin",
-    "crates/agentx-grpc",
-    "crates/agentx-registry",
     "crates/agentx-router",
-    "crates/agentx-server",
-    "examples/basic-plugin",
-    "examples/langchain-plugin",
-    "examples/mastra-plugin"
 ]
 
 [workspace.package]
@@ -64,6 +56,9 @@ redis = { version = "0.24", features = ["tokio-comp"] }
 
 # HTTP客户端
 reqwest = { version = "0.11", features = ["json"] }
+
+# 正则表达式
+regex = "1.0"
 
 # 测试
 mockall = "0.12"

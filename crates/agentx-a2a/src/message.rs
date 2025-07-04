@@ -311,7 +311,7 @@ impl A2AMessage {
 }
 
 fn default_version() -> String {
-    crate::A2A_VERSION.to_string()
+    "1.0".to_string()
 }
 
 fn default_format() -> String {

@@ -271,12 +271,12 @@ impl CapabilityDiscovery {
             let regex_pattern = pattern
                 .replace('*', ".*")
                 .replace('?', ".");
-            
+
             if let Ok(regex) = regex::Regex::new(&format!("^{}$", regex_pattern)) {
                 return regex.is_match(name);
             }
         }
-        
+
         false
     }
     
