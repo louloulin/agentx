@@ -430,10 +430,10 @@ mod tests {
         
         // 添加一个不存在的目标
         health_checker.start_monitoring("nonexistent", "http://localhost:99999".to_string()).await.unwrap();
-        
-        // 检查健康状态（应该返回Unknown，因为还没有检查结果）
+
+        // 检查健康状态（应该返回Unhealthy，因为端口不存在）
         let status = health_checker.check_health("nonexistent").await.unwrap();
-        assert_eq!(status, HealthStatus::Unknown);
+        assert_eq!(status, HealthStatus::Unhealthy);
         
         // 检查不存在的目标
         let status = health_checker.check_health("not-found").await.unwrap();

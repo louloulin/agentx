@@ -130,12 +130,15 @@ impl ClusterManager {
         }
         
         // 通过负载均衡器选择目标
-        let target_ids: Vec<String> = agents.iter().map(|a| a.id.clone()).collect();
-        
+        // 注意：负载均衡器中的ID是带"agent-"前缀的
+        let target_ids: Vec<String> = agents.iter().map(|a| format!("agent-{}", a.id)).collect();
+
         if let Some(selected_id) = self.load_balancer.select_target(&target_ids).await? {
             // 返回选中的Agent信息
+            // 从选中的ID中移除"agent-"前缀来匹配原始Agent ID
+            let original_id = selected_id.strip_prefix("agent-").unwrap_or(&selected_id);
             for agent in agents {
-                if agent.id == selected_id {
+                if agent.id == original_id {
                     return Ok(Some(agent));
                 }
             }
@@ -162,6 +165,11 @@ impl ClusterManager {
     /// 检查Agent健康状态
     pub async fn check_agent_health(&self, agent_id: &str) -> ClusterResult<HealthStatus> {
         self.health_checker.check_health(agent_id).await
+    }
+
+    /// 获取负载均衡器目标列表（用于调试）
+    pub async fn list_load_balancer_targets(&self) -> ClusterResult<Vec<load_balancer::TargetNode>> {
+        self.load_balancer.list_targets().await
     }
 }
 

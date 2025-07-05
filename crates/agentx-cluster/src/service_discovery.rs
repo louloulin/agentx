@@ -350,15 +350,34 @@ mod tests {
 
     
     fn create_test_agent(id: &str) -> AgentCard {
-        use agentx_a2a::{AgentStatus, TrustLevel, InteractionModality};
+        use agentx_a2a::{AgentStatus, TrustLevel, InteractionModality, Capability, CapabilityType, Endpoint};
 
         AgentCard {
             id: id.to_string(),
             name: format!("Test Agent {}", id),
             description: "Test agent for service discovery".to_string(),
             version: "1.0.0".to_string(),
-            capabilities: vec![],
-            endpoints: vec![],
+            capabilities: vec![
+                Capability {
+                    name: "test".to_string(),
+                    description: "Test capability".to_string(),
+                    capability_type: CapabilityType::ToolExecution,
+                    input_schema: None,
+                    output_schema: None,
+                    metadata: std::collections::HashMap::new(),
+                    available: true,
+                    cost: None,
+                }
+            ],
+            endpoints: vec![
+                Endpoint {
+                    endpoint_type: "http".to_string(),
+                    url: format!("http://localhost:8080"),
+                    protocols: vec!["http".to_string()],
+                    auth: None,
+                    metadata: std::collections::HashMap::new(),
+                }
+            ],
             metadata: std::collections::HashMap::new(),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
