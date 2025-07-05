@@ -7,6 +7,8 @@ pub mod converter;
 pub mod plugin_bridge;
 pub mod plugin_manager;
 pub mod grpc_server;
+pub mod grpc_client;
+
 // 生成的protobuf代码
 pub mod proto {
     tonic::include_proto!("agentx.plugin.v1");
