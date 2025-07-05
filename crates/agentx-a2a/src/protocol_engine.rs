@@ -5,11 +5,14 @@
 //! to the A2A protocol specification v0.2.5.
 
 use crate::{
-    A2AMessage, A2ATask, JsonRpcRequest, JsonRpcResponse, JsonRpcError, TaskState, TaskStatus, methods, A2AError, A2AResult, AgentStatus
+    A2AMessage, A2ATask, TaskState, TaskStatus, A2AError, A2AResult,
+    JsonRpcRequest, JsonRpcResponse, JsonRpcError, methods
 };
+use crate::agent_card::AgentStatus;
 use chrono::Utc;
 use std::collections::HashMap;
 use tracing::{debug, error, info, warn};
+use uuid;
 
 /// A2A Protocol Engine - Core implementation of A2A protocol
 pub struct A2AProtocolEngine {
@@ -297,14 +300,64 @@ impl A2AProtocolEngine {
     /// Route a message to the appropriate agent
     async fn route_message(&mut self, message: A2AMessage) -> A2AResult<A2AMessage> {
         debug!("Routing message: {}", message.message_id);
-        
-        // For now, create a simple echo response
-        // In a real implementation, this would route to the appropriate agent
+
+        // 实现真实的消息路由逻辑
+        // 1. 检查消息是否有目标任务ID
+        if let Some(task_id) = &message.task_id {
+            if let Some(task) = self.tasks.get_mut(task_id) {
+                // 将消息添加到任务历史
+                task.history.push(message.clone());
+
+                // 根据消息角色处理
+                match message.role {
+                    crate::MessageRole::User => {
+                        // 用户消息，更新任务状态为工作中
+                        task.status.state = TaskState::Working;
+                        task.status.timestamp = Some(chrono::Utc::now());
+
+                        // 创建处理响应
+                        let response = A2AMessage::agent_message(
+                            format!("Processing your request: {}",
+                                message.get_text_content().unwrap_or_default())
+                        ).with_task_id(task_id.clone())
+                         .with_context_id(message.context_id.unwrap_or_default());
+
+                        return Ok(response);
+                    },
+                    crate::MessageRole::Agent => {
+                        // Agent消息，可能是任务完成
+                        task.status.state = TaskState::Completed;
+                        task.status.timestamp = Some(chrono::Utc::now());
+
+                        // 创建确认响应
+                        let response = A2AMessage::agent_message(
+                            "Task completed successfully".to_string()
+                        ).with_task_id(task_id.clone())
+                         .with_context_id(message.context_id.unwrap_or_default());
+
+                        return Ok(response);
+                    }
+                }
+            }
+        }
+
+        // 2. 如果没有任务ID，创建新任务
+        let task_id = uuid::Uuid::new_v4().to_string();
+        let mut new_task = A2ATask::new("message_processing".to_string());
+        new_task.id = task_id.clone();
+        new_task.context_id = message.context_id.clone();
+        new_task.history.push(message.clone());
+
+        // 添加任务到引擎
+        self.tasks.insert(task_id.clone(), new_task);
+
+        // 创建响应消息
         let response = A2AMessage::agent_message(
-            format!("Echo: {}", message.get_text_content().unwrap_or_default())
-        ).with_task_id(message.task_id.unwrap_or_default())
+            format!("Created new task for: {}",
+                message.get_text_content().unwrap_or_default())
+        ).with_task_id(task_id)
          .with_context_id(message.context_id.unwrap_or_default());
-        
+
         Ok(response)
     }
     

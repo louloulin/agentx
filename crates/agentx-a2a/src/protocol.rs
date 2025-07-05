@@ -4,15 +4,57 @@
 //! processing, routing, and agent communication.
 
 use crate::{
-    A2AMessage, AgentCard, CapabilityDiscovery, CapabilityQuery, 
-    A2AError, A2AResult, MessageType, MessagePayload, ErrorPayload
+    A2AMessage, AgentCard, CapabilityDiscovery, CapabilityQuery,
+    A2AError, A2AResult, MessageRole, MessagePart
 };
 use async_trait::async_trait;
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
+
+/// Message type enumeration for protocol handling
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MessageType {
+    Request,
+    Response,
+    Notification,
+    Error,
+}
+
+/// Message payload for protocol messages
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MessagePayload {
+    Text(TextPayload),
+    Data(serde_json::Value),
+    Error(ErrorPayload),
+}
+
+/// Text payload structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TextPayload {
+    pub content: String,
+    pub format: String,
+    pub language: Option<String>,
+}
+
+/// Error payload structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorPayload {
+    pub code: i32,
+    pub message: String,
+    pub details: Option<serde_json::Value>,
+}
+
+/// Endpoint information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Endpoint {
+    pub url: String,
+    pub protocol: String,
+    pub metadata: HashMap<String, String>,
+}
 
 /// A2A Protocol Engine
 pub struct A2AProtocolEngine {
@@ -360,7 +402,8 @@ impl Default for MessageContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AgentCard, Endpoint, MessagePayload, TextPayload};
+    use super::{MessagePayload, TextPayload, Endpoint};
+    use crate::AgentCard;
 
     #[tokio::test]
     async fn test_register_agent() {

@@ -5,8 +5,9 @@
 
 use actix::prelude::*;
 use crate::{
-    A2AMessage, A2AError, A2AResult, MessageRole, ProtocolConfig
+    A2AMessage, A2AError, A2AResult
 };
+use crate::protocol::ProtocolConfig;
 use crate::protocol_engine::A2AProtocolEngine;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};

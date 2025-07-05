@@ -281,6 +281,9 @@ pub mod methods {
     pub const CANCEL_TASK: &str = "cancelTask";
     pub const SEND_MESSAGE: &str = "sendMessage";
     pub const GET_CAPABILITIES: &str = "getCapabilities";
+    pub const REGISTER_AGENT: &str = "registerAgent";
+    pub const UNREGISTER_AGENT: &str = "unregisterAgent";
+    pub const DISCOVER_AGENTS: &str = "discoverAgents";
 }
 
 impl A2AMessage {

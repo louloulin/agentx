@@ -7,6 +7,7 @@
 pub mod message;
 pub mod agent_card;
 pub mod capability;
+// pub mod protocol;
 pub mod protocol_engine;
 pub mod error;
 pub mod streaming;
