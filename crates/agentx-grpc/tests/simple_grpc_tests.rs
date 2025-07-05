@@ -6,7 +6,7 @@ use agentx_grpc::A2AConverter;
 use agentx_a2a::{A2AMessage, MessageRole};
 
 #[tokio::test]
-async fn test_a2a_message_conversion() {
+async fn test_simple_a2a_message_conversion() {
     println!("🧪 测试A2A消息转换");
     
     // 创建测试消息
@@ -36,7 +36,7 @@ async fn test_a2a_message_conversion() {
 }
 
 #[tokio::test]
-async fn test_grpc_message_serialization() {
+async fn test_simple_grpc_message_serialization() {
     println!("🧪 测试gRPC消息序列化");
     
     // 创建复杂的A2A消息
@@ -80,7 +80,7 @@ async fn test_grpc_message_serialization() {
 }
 
 #[tokio::test]
-async fn test_grpc_performance_basic() {
+async fn test_simple_grpc_performance_basic() {
     println!("🧪 测试gRPC基础性能");
     
     let start_time = std::time::Instant::now();
@@ -119,7 +119,7 @@ async fn test_grpc_performance_basic() {
 }
 
 #[tokio::test]
-async fn test_grpc_error_handling() {
+async fn test_simple_grpc_error_handling() {
     println!("🧪 测试gRPC错误处理");
     
     // 测试无效消息转换
@@ -149,13 +149,22 @@ async fn test_grpc_error_handling() {
 #[tokio::test]
 async fn test_grpc_core_functionality() {
     println!("\n🚀 运行gRPC核心功能测试");
-    
-    // 运行核心测试
-    test_a2a_message_conversion().await;
-    test_grpc_message_serialization().await;
-    test_grpc_performance_basic().await;
-    test_grpc_error_handling().await;
-    
+
+    // 测试A2A消息转换
+    println!("🧪 测试A2A消息转换");
+    let original_message = A2AMessage::new_text(
+        MessageRole::User,
+        "测试消息内容".to_string()
+    );
+
+    let grpc_request = A2AConverter::a2a_to_grpc_request(&original_message)
+        .expect("A2A到gRPC转换失败");
+
+    assert_eq!(grpc_request.message_id, original_message.message_id);
+    assert!(grpc_request.payload.is_some());
+    assert!(grpc_request.timestamp.is_some());
+    println!("   ✅ A2A消息转换测试通过");
+
     println!("\n✅ 所有gRPC核心功能测试通过");
     println!("📊 测试总结:");
     println!("   - A2A消息转换: ✅");
