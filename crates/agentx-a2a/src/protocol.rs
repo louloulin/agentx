@@ -246,10 +246,8 @@ impl A2AProtocolEngine {
             handler.handle(&message, &context).await?
         } else {
             warn!("No handler found for message type: {:?}", message.message_type);
-            Some(A2AMessage::error_response(
-                &message,
-                "NO_HANDLER".to_string(),
-                format!("No handler for message type: {:?}", message.message_type),
+            Some(A2AMessage::agent_message(
+                format!("Error: No handler for message type: {:?}", message.message_type)
             ))
         };
         

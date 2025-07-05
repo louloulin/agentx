@@ -1,5 +1,5 @@
 //! AgentX A2A Protocol Implementation
-//! 
+//!
 //! This crate implements the Agent-to-Agent (A2A) protocol for AgentX platform.
 //! It provides message formats, serialization, and communication primitives
 //! for inter-agent communication following the A2A specification.
@@ -17,11 +17,12 @@ pub mod monitoring;
 pub mod monitoring_dashboard;
 // pub mod client;
 // pub mod server;
-// pub mod actors;
+pub mod actors;
 
 pub use message::*;
 pub use agent_card::*;
 pub use capability::*;
+// pub use protocol::*;
 pub use protocol_engine::*;
 pub use error::*;
 pub use streaming::*;
@@ -30,6 +31,7 @@ pub use security::{AuthType, SecurityManager, SecurityContext, SecurityConfig, A
 pub use encryption::*;
 pub use monitoring::*;
 pub use monitoring_dashboard::*;
+pub use actors::*;
 
 /// A2A Protocol version
 pub const A2A_VERSION: &str = "1.0";

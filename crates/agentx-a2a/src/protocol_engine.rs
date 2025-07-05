@@ -48,6 +48,9 @@ pub struct ProtocolEngineConfig {
     pub task_timeout_seconds: u64,
     pub enable_message_validation: bool,
     pub enable_task_persistence: bool,
+    pub handler_pool_size: Option<usize>,
+    pub validate_messages: bool,
+    pub max_message_size: usize,
 }
 
 /// Engine statistics
@@ -424,6 +427,9 @@ impl Default for ProtocolEngineConfig {
             task_timeout_seconds: 300, // 5 minutes
             enable_message_validation: true,
             enable_task_persistence: false,
+            handler_pool_size: Some(10),
+            validate_messages: true,
+            max_message_size: 1024 * 1024, // 1MB
         }
     }
 }

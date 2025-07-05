@@ -23,7 +23,7 @@ pub struct PluginSupervisorActor {
 }
 
 /// Plugin process information
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PluginProcess {
     pub id: String,
     pub name: String,
@@ -117,7 +117,7 @@ pub struct PluginInfo {
 
 /// Message to get supervisor statistics
 #[derive(Message, Debug)]
-#[rtype(result = "SupervisorStats")]
+#[rtype(result = "A2AResult<SupervisorStats>")]
 pub struct GetSupervisorStats;
 
 /// Message for periodic health check
@@ -348,19 +348,23 @@ impl Handler<RestartPlugin> for PluginSupervisorActor {
     fn handle(&mut self, msg: RestartPlugin, ctx: &mut Self::Context) -> Self::Result {
         let plugin_id = msg.plugin_id.clone();
         
-        if let Some(plugin) = self.plugins.get(&plugin_id).cloned() {
+        if self.plugins.contains_key(&plugin_id) {
+            // Get plugin info before stopping
+            let (executable_path, grpc_port) = {
+                let plugin = self.plugins.get(&plugin_id).unwrap();
+                (plugin.executable_path.clone(), plugin.grpc_port)
+            };
+
             // Stop the plugin first
             self.stop_plugin_process(&plugin_id, true)?;
-            
+
             // Increment restart count
             if let Some(plugin_ref) = self.plugins.get_mut(&plugin_id) {
                 plugin_ref.restart_count += 1;
             }
-            
+
             // Schedule restart after delay
             let restart_delay = std::time::Duration::from_millis(self.config.restart_delay_ms);
-            let executable_path = plugin.executable_path.clone();
-            let grpc_port = plugin.grpc_port;
             let config = HashMap::new(); // TODO: Store original config
             
             ctx.run_later(restart_delay, move |actor, _ctx| {
@@ -409,10 +413,10 @@ impl Handler<ListPlugins> for PluginSupervisorActor {
 
 /// Handle GetSupervisorStats
 impl Handler<GetSupervisorStats> for PluginSupervisorActor {
-    type Result = SupervisorStats;
-    
+    type Result = A2AResult<SupervisorStats>;
+
     fn handle(&mut self, _msg: GetSupervisorStats, _ctx: &mut Self::Context) -> Self::Result {
-        self.stats.clone()
+        Ok(self.stats.clone())
     }
 }
 

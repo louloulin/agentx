@@ -10,15 +10,50 @@ pub mod supervisor_actor;
 pub mod security_actor;
 pub mod metrics_actor;
 
-pub use protocol_actor::*;
-pub use registry_actor::*;
-pub use router_actor::*;
-pub use supervisor_actor::*;
-pub use security_actor::*;
-pub use metrics_actor::*;
+// Protocol Actor exports
+pub use protocol_actor::{
+    A2AProtocolActor, HandleMessage, RegisterHandler, UpdateProtocolConfig,
+    GetProtocolStats, ProtocolStats
+};
+
+// Registry Actor exports
+pub use registry_actor::{
+    AgentRegistryActor, RegisterAgent, UnregisterAgent, GetAgent,
+    ListAgents, GetRegistryStats, RegistryStats, UpdateAgentStatus,
+    DiscoverAgents, AgentFilter,
+    PeriodicHealthCheck as RegistryPeriodicHealthCheck
+};
+
+// Router Actor exports
+pub use router_actor::{
+    MessageRouterActor, RouteMessage, AddRoute, RemoveRoute,
+    GetRouterStats, RouterStats, RouteResult
+};
+
+// Supervisor Actor exports
+pub use supervisor_actor::{
+    PluginSupervisorActor, StartPlugin, StopPlugin, RestartPlugin,
+    GetPluginStatus, ListPlugins, GetSupervisorStats, SupervisorStats,
+    PluginProcess, PluginStatus, SupervisorConfig,
+    PeriodicHealthCheck as SupervisorPeriodicHealthCheck
+};
+
+// Security Actor exports
+pub use security_actor::{
+    SecurityManagerActor, AuthenticateUser, AuthorizeAction, CreateSession,
+    RevokeSession, GetSecurityStats, SecurityStats, UserSession,
+    SecurityPolicy, AuthenticationResult, AuthorizationResult
+};
+
+// Metrics Actor exports
+pub use metrics_actor::{
+    MetricsActor, RecordMetric, GetMetrics, GetMetricsStats,
+    MetricsStats, MetricType as ActorMetricType,
+    PerformanceMetrics as ActorPerformanceMetrics
+};
 
 use actix::prelude::*;
-use crate::{A2AMessage, AgentCard, A2AError};
+use crate::A2AError;
 use serde::{Deserialize, Serialize};
 
 /// Common actor messages for the A2A system

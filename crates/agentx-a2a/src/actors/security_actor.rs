@@ -314,7 +314,7 @@ impl SecurityManagerActor {
     }
     
     /// Check authorization
-    fn check_authorization(&self, session_id: &str, resource: &str, action: &str) -> AuthorizationResult {
+    fn check_authorization(&self, session_id: &str, _resource: &str, action: &str) -> AuthorizationResult {
         if let Some(session) = self.sessions.get(session_id) {
             // Simple permission check
             let allowed = session.permissions.contains(&action.to_string()) ||

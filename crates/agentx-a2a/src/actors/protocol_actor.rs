@@ -7,9 +7,7 @@ use actix::prelude::*;
 use crate::{
     A2AMessage, A2AError, A2AResult
 };
-use crate::protocol::ProtocolConfig;
-use crate::protocol_engine::A2AProtocolEngine;
-use chrono::Utc;
+use crate::protocol_engine::{A2AProtocolEngine, ProtocolEngineConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, error, info, warn};
@@ -19,6 +17,9 @@ use uuid::Uuid;
 pub struct A2AProtocolActor {
     /// A2A protocol engine
     engine: A2AProtocolEngine,
+
+    /// Protocol configuration
+    config: ProtocolEngineConfig,
 
     /// Message processing statistics
     stats: ProtocolStats,
@@ -64,14 +65,14 @@ pub struct RegisterHandler {
 
 /// Message to get protocol statistics
 #[derive(Message, Debug)]
-#[rtype(result = "ProtocolStats")]
+#[rtype(result = "A2AResult<ProtocolStats>")]
 pub struct GetProtocolStats;
 
 /// Message to update protocol configuration
 #[derive(Message, Debug)]
 #[rtype(result = "A2AResult<()>")]
 pub struct UpdateProtocolConfig {
-    pub config: ProtocolConfig,
+    pub config: ProtocolEngineConfig,
 }
 
 impl Actor for A2AProtocolActor {
@@ -94,17 +95,18 @@ impl Actor for A2AProtocolActor {
 
 impl A2AProtocolActor {
     /// Create a new A2A Protocol Actor
-    pub fn new(config: ProtocolConfig) -> Self {
+    pub fn new(config: ProtocolEngineConfig) -> Self {
+        let engine = A2AProtocolEngine::new(config.clone());
         Self {
+            engine,
             config,
             stats: ProtocolStats::default(),
-            handlers: HashMap::new(),
             handler_pool: Vec::new(),
         }
     }
     
     /// Initialize the message handler pool
-    fn initialize_handler_pool(&mut self, ctx: &mut Context<Self>) {
+    fn initialize_handler_pool(&mut self, _ctx: &mut Context<Self>) {
         let pool_size = self.config.handler_pool_size.unwrap_or(10);
         
         for i in 0..pool_size {
@@ -143,16 +145,8 @@ impl A2AProtocolActor {
         }
         
         // Check required fields
-        if message.id.is_empty() {
+        if message.message_id.is_empty() {
             return Err(A2AError::validation("Message ID is required"));
-        }
-        
-        if message.from.is_empty() {
-            return Err(A2AError::validation("Source agent ID is required"));
-        }
-        
-        if message.to.is_empty() {
-            return Err(A2AError::validation("Target agent ID is required"));
         }
         
         // Check message size
@@ -164,15 +158,7 @@ impl A2AProtocolActor {
             ));
         }
         
-        // Check version compatibility
-        if message.version != crate::A2A_VERSION {
-            return Err(A2AError::version_mismatch(crate::A2A_VERSION, &message.version));
-        }
-        
-        // Check expiration
-        if message.is_expired() {
-            return Err(A2AError::MessageExpired);
-        }
+        // Version and expiration checks removed as they're not part of current A2AMessage structure
         
         Ok(())
     }
@@ -202,8 +188,7 @@ impl Handler<ProcessA2AMessage> for A2AProtocolActor {
     fn handle(&mut self, msg: ProcessA2AMessage, _ctx: &mut Self::Context) -> Self::Result {
         let start_time = std::time::Instant::now();
         
-        debug!("Processing A2A message: {} from {} to {}", 
-               msg.message.id, msg.message.from, msg.message.to);
+        debug!("Processing A2A message: {}", msg.message.message_id);
         
         // Validate message
         if let Err(e) = self.validate_message(&msg.message) {
@@ -260,20 +245,20 @@ impl Handler<ProcessA2AMessage> for A2AProtocolActor {
 /// Handle RegisterHandler
 impl Handler<RegisterHandler> for A2AProtocolActor {
     type Result = A2AResult<()>;
-    
+
     fn handle(&mut self, msg: RegisterHandler, _ctx: &mut Self::Context) -> Self::Result {
-        info!("Registering handler for message type: {:?}", msg.message_type);
-        self.handlers.insert(msg.message_type, msg.handler);
+        info!("Registering handler: {}", msg.handler_name);
+        self.handler_pool.push(msg.handler);
         Ok(())
     }
 }
 
 /// Handle GetProtocolStats
 impl Handler<GetProtocolStats> for A2AProtocolActor {
-    type Result = ProtocolStats;
-    
+    type Result = A2AResult<ProtocolStats>;
+
     fn handle(&mut self, _msg: GetProtocolStats, _ctx: &mut Self::Context) -> Self::Result {
-        self.stats.clone()
+        Ok(self.stats.clone())
     }
 }
 
@@ -321,36 +306,18 @@ impl Handler<HandleMessage> for MessageHandlerActor {
     
     fn handle(&mut self, msg: HandleMessage, _ctx: &mut Self::Context) -> Self::Result {
         self.processed_count += 1;
-        
-        debug!("Handler {} processing message {}", self.name, msg.message.id);
-        
-        // Default echo behavior - in real implementation, this would route to appropriate handlers
-        match msg.message.message_type {
-            MessageType::Request => {
-                // Create echo response
-                let response = A2AMessage::response(
-                    &msg.message,
-                    msg.message.payload.clone(),
-                );
-                Ok(Some(response))
-            }
-            MessageType::Notification => {
-                // Notifications don't require responses
-                Ok(None)
-            }
-            _ => {
-                // For other message types, create a simple acknowledgment
-                let response = A2AMessage::response(
-                    &msg.message,
-                    MessagePayload::Text(crate::TextPayload {
-                        content: "Message received".to_string(),
-                        format: "plain".to_string(),
-                        language: None,
-                    }),
-                );
-                Ok(Some(response))
-            }
-        }
+
+        debug!("Handler {} processing message {}", self.name, msg.message.message_id);
+
+        // Simple echo behavior - create a response message
+        let response_text = if let Some(text) = msg.message.get_text_content() {
+            format!("Echo: {}", text)
+        } else {
+            "Message received".to_string()
+        };
+
+        let response = A2AMessage::agent_message(response_text);
+        Ok(Some(response))
     }
 }
 

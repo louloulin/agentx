@@ -12,7 +12,7 @@ use crate::agent_card::AgentStatus;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 /// Agent Registry Actor
 pub struct AgentRegistryActor {
