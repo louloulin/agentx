@@ -69,6 +69,7 @@ pub struct A2ATask {
 /// Message role in A2A protocol
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum MessageRole {
     /// User message
     User,
@@ -88,12 +89,13 @@ pub struct TaskStatus {
 
     /// Status message (for input-required state)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<A2AMessage>,
+    pub message: Option<String>,
 }
 
 /// Task state enumeration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum TaskState {
     /// Task has been submitted
     Submitted,

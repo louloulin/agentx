@@ -1,7 +1,8 @@
 [workspace]
+resolver = "2"
 members = [
     "crates/agentx-a2a",
-    "crates/agentx-router",
+    "crates/agentx-http",
 ]
 
 [workspace.package]

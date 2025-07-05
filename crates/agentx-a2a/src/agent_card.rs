@@ -180,6 +180,7 @@ pub struct CostInfo {
 /// Agent status
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum AgentStatus {
     /// Agent is online and available
     #[default]
