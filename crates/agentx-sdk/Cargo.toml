@@ -1,0 +1,80 @@
+[package]
+name = "agentx-sdk"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "AgentX通用插件SDK - 支持多语言AI框架集成"
+
+[dependencies]
+# 核心依赖
+agentx-a2a = { path = "../agentx-a2a" }
+agentx-grpc = { path = "../agentx-grpc" }
+
+# gRPC和序列化
+tonic.workspace = true
+prost.workspace = true
+prost-types.workspace = true
+
+# 异步运行时
+tokio.workspace = true
+tokio-stream.workspace = true
+
+# 序列化
+serde.workspace = true
+serde_json.workspace = true
+
+# 错误处理
+anyhow.workspace = true
+thiserror.workspace = true
+
+# 日志
+tracing.workspace = true
+tracing-subscriber = "0.3"
+
+# 时间处理
+chrono.workspace = true
+
+# URL处理
+url = "2.4"
+
+# UUID生成
+uuid.workspace = true
+
+# 异步trait
+async-trait.workspace = true
+
+# 配置管理
+config.workspace = true
+
+# HTTP客户端
+reqwest.workspace = true
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall.workspace = true
+
+[features]
+default = ["python", "nodejs", "rust"]
+python = []
+nodejs = []
+rust = []
+csharp = []
+go = []
+
+[[example]]
+name = "plugin_sdk_demo"
+path = "../../examples/plugin_sdk_demo.rs"
+
+[[example]]
+name = "langchain_plugin_demo"
+path = "../../examples/langchain_plugin_demo.rs"
+
+[[example]]
+name = "autogen_plugin_demo"
+path = "../../examples/autogen_plugin_demo.rs"
+
+[[example]]
+name = "mastra_plugin_demo"
+path = "../../examples/mastra_plugin_demo.rs"

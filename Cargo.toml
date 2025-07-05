@@ -4,6 +4,7 @@ members = [
     "crates/agentx-a2a",
     "crates/agentx-http",
     "crates/agentx-grpc",
+    "crates/agentx-sdk",
 ]
 
 [workspace.package]
