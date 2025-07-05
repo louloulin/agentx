@@ -242,10 +242,14 @@ name = "agentx"
 version = "0.1.0"
 dependencies = [
  "agentx-a2a",
+ "agentx-cluster",
  "agentx-core",
  "agentx-grpc",
+ "agentx-http",
  "agentx-sdk",
+ "base64 0.21.7",
  "chrono",
+ "reqwest",
  "serde_json",
  "tokio",
  "tracing",

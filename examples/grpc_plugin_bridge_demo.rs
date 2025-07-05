@@ -59,7 +59,8 @@ async fn initialize_components() -> Result<(PluginBridge, Arc<PluginManager>), B
     println!("🔧 初始化A2A协议组件");
     
     // 创建A2A协议引擎
-    let a2a_engine = Arc::new(RwLock::new(A2AProtocolEngine::new()));
+    let config = ProtocolEngineConfig::default();
+    let a2a_engine = Arc::new(RwLock::new(A2AProtocolEngine::new(config)));
     println!("   ✅ A2A协议引擎初始化完成");
     
     // 创建流管理器

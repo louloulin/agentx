@@ -80,12 +80,16 @@ repository = "https://github.com/agentx/agentx"
 agentx-core = { path = "crates/agentx-core" }
 agentx-a2a = { path = "crates/agentx-a2a" }
 agentx-grpc = { path = "crates/agentx-grpc" }
+agentx-http = { path = "crates/agentx-http" }
 agentx-sdk = { path = "crates/agentx-sdk" }
+agentx-cluster = { path = "crates/agentx-cluster" }
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.11", features = ["json"] }
+base64 = "0.21"
 
 [[example]]
 name = "agentx_ecosystem_demo"
