@@ -6,9 +6,9 @@ use agentx_grpc::{
     PluginBridge, PluginManager, PluginConfig, AgentXGrpcServer, ServerConfig,
 };
 use agentx_a2a::{
-    A2AProtocolEngine, StreamManager, SecurityManager, SecurityConfig, MonitoringManager, 
+    A2AProtocolEngine, ProtocolEngineConfig, StreamManager, SecurityManager, SecurityConfig, MonitoringManager,
     MonitoringConfig, A2AMessage, MessageRole, AgentCard, TrustLevel, AgentStatus,
-    StreamMessageBuilder, StreamType,
+    StreamMessageBuilder, StreamType, Capability, CapabilityType, Endpoint, InteractionModality,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -55,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// 初始化核心组件
-async fn initialize_components() -> Result<(PluginBridge, Arc<PluginManager>), Box<dyn std::error::Error>> {
+async fn initialize_components() -> Result<(Arc<PluginBridge>, Arc<PluginManager>), Box<dyn std::error::Error>> {
     println!("🔧 初始化A2A协议组件");
     
     // 创建A2A协议引擎
@@ -95,10 +95,11 @@ async fn initialize_components() -> Result<(PluginBridge, Arc<PluginManager>), B
     println!("   ✅ 插件桥接器创建完成");
     
     // 创建插件管理器
-    let plugin_manager = Arc::new(PluginManager::new(Arc::new(bridge.clone())));
+    let bridge_arc = Arc::new(bridge);
+    let plugin_manager = Arc::new(PluginManager::new(bridge_arc.clone()));
     println!("   ✅ 插件管理器创建完成");
-    
-    Ok((bridge, plugin_manager))
+
+    Ok((bridge_arc, plugin_manager))
 }
 
 /// 配置插件
@@ -181,69 +182,152 @@ async fn demonstrate_agent_registration(bridge: &PluginBridge) -> Result<(), Box
             id: "langchain_agent_001".to_string(),
             name: "LangChain Text Generator".to_string(),
             description: "基于LangChain的文本生成Agent".to_string(),
-            framework: "langchain".to_string(),
             version: "1.0.0".to_string(),
             status: AgentStatus::Online,
             trust_level: TrustLevel::Trusted,
             capabilities: vec![
-                "text_generation".to_string(),
-                "question_answering".to_string(),
-                "summarization".to_string(),
+                Capability {
+                    name: "text_generation".to_string(),
+                    description: "Generate text using LangChain".to_string(),
+                    capability_type: CapabilityType::ToolExecution,
+                    input_schema: None,
+                    output_schema: None,
+                    metadata: HashMap::new(),
+                    available: true,
+                    cost: None,
+                },
+                Capability {
+                    name: "question_answering".to_string(),
+                    description: "Answer questions using LangChain".to_string(),
+                    capability_type: CapabilityType::ToolExecution,
+                    input_schema: None,
+                    output_schema: None,
+                    metadata: HashMap::new(),
+                    available: true,
+                    cost: None,
+                },
             ],
-            tags: vec!["nlp".to_string(), "generation".to_string()],
+            endpoints: vec![
+                Endpoint {
+                    endpoint_type: "http".to_string(),
+                    url: "http://localhost:8080".to_string(),
+                    protocols: vec!["http".to_string()],
+                    auth: None,
+                    metadata: HashMap::new(),
+                }
+            ],
+            tags: vec!["nlp".to_string(), "generation".to_string(), "langchain".to_string()],
             metadata: {
                 let mut meta = HashMap::new();
-                meta.insert("model".to_string(), "gpt-4".to_string());
-                meta.insert("max_tokens".to_string(), "2048".to_string());
+                meta.insert("model".to_string(), serde_json::Value::String("gpt-4".to_string()));
+                meta.insert("max_tokens".to_string(), serde_json::Value::String("2048".to_string()));
+                meta.insert("framework".to_string(), serde_json::Value::String("langchain".to_string()));
                 meta
             },
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+            expires_at: None,
+            supported_versions: vec!["0.2.5".to_string()],
+            interaction_modalities: vec![InteractionModality::Text],
+            ux_capabilities: None,
+            supported_task_types: vec!["text_generation".to_string(), "question_answering".to_string()],
         },
         AgentCard {
             id: "autogen_agent_001".to_string(),
             name: "AutoGen Coordinator".to_string(),
             description: "基于AutoGen的多Agent协调器".to_string(),
-            framework: "autogen".to_string(),
             version: "1.0.0".to_string(),
             status: AgentStatus::Online,
             trust_level: TrustLevel::Verified,
             capabilities: vec![
-                "multi_agent_coordination".to_string(),
-                "conversation_management".to_string(),
-                "task_delegation".to_string(),
+                Capability {
+                    name: "multi_agent_coordination".to_string(),
+                    description: "Coordinate multiple agents".to_string(),
+                    capability_type: CapabilityType::ToolExecution,
+                    input_schema: None,
+                    output_schema: None,
+                    metadata: HashMap::new(),
+                    available: true,
+                    cost: None,
+                },
             ],
-            tags: vec!["coordination".to_string(), "multi_agent".to_string()],
-            metadata: HashMap::new(),
+            endpoints: vec![
+                Endpoint {
+                    endpoint_type: "http".to_string(),
+                    url: "http://localhost:8081".to_string(),
+                    protocols: vec!["http".to_string()],
+                    auth: None,
+                    metadata: HashMap::new(),
+                }
+            ],
+            tags: vec!["coordination".to_string(), "multi_agent".to_string(), "autogen".to_string()],
+            metadata: {
+                let mut meta = HashMap::new();
+                meta.insert("framework".to_string(), serde_json::Value::String("autogen".to_string()));
+                meta
+            },
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+            expires_at: None,
+            supported_versions: vec!["0.2.5".to_string()],
+            interaction_modalities: vec![InteractionModality::Text],
+            ux_capabilities: None,
+            supported_task_types: vec!["coordination".to_string()],
         },
         AgentCard {
             id: "mastra_agent_001".to_string(),
             name: "Mastra Workflow Engine".to_string(),
             description: "基于Mastra的工作流执行Agent".to_string(),
-            framework: "mastra".to_string(),
             version: "1.0.0".to_string(),
             status: AgentStatus::Online,
             trust_level: TrustLevel::Internal,
             capabilities: vec![
-                "workflow_execution".to_string(),
-                "memory_management".to_string(),
-                "tool_integration".to_string(),
+                Capability {
+                    name: "workflow_execution".to_string(),
+                    description: "Execute workflows using Mastra".to_string(),
+                    capability_type: CapabilityType::ToolExecution,
+                    input_schema: None,
+                    output_schema: None,
+                    metadata: HashMap::new(),
+                    available: true,
+                    cost: None,
+                },
             ],
-            tags: vec!["workflow".to_string(), "automation".to_string()],
-            metadata: HashMap::new(),
+            endpoints: vec![
+                Endpoint {
+                    endpoint_type: "http".to_string(),
+                    url: "http://localhost:8082".to_string(),
+                    protocols: vec!["http".to_string()],
+                    auth: None,
+                    metadata: HashMap::new(),
+                }
+            ],
+            tags: vec!["workflow".to_string(), "automation".to_string(), "mastra".to_string()],
+            metadata: {
+                let mut meta = HashMap::new();
+                meta.insert("framework".to_string(), serde_json::Value::String("mastra".to_string()));
+                meta
+            },
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+            expires_at: None,
+            supported_versions: vec!["0.2.5".to_string()],
+            interaction_modalities: vec![InteractionModality::Text],
+            ux_capabilities: None,
+            supported_task_types: vec!["workflow_execution".to_string()],
         },
     ];
     
     // 注册Agent路由
     for agent in &agents {
-        let plugin_id = format!("{}_plugin", agent.framework);
+        // 从metadata中获取framework信息
+        let framework = agent.metadata.get("framework")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        let plugin_id = format!("{}_plugin", framework);
         bridge.register_agent_route(agent.id.clone(), plugin_id).await;
-        
-        println!("   👤 注册Agent: {} ({})", agent.name, agent.framework);
+
+        println!("   👤 注册Agent: {} ({})", agent.name, framework);
         println!("     ID: {}", agent.id);
         println!("     信任级别: {:?}", agent.trust_level);
         println!("     能力数量: {}", agent.capabilities.len());
@@ -261,17 +345,17 @@ async fn demonstrate_message_routing(bridge: &PluginBridge) -> Result<(), Box<dy
     // 创建不同类型的消息
     let messages = vec![
         (
-            A2AMessage::new_text(MessageRole::Agent, "请生成一篇关于AI的文章"),
+            A2AMessage::new_text(MessageRole::Agent, "请生成一篇关于AI的文章".to_string()),
             "langchain_agent_001",
             "文本生成请求"
         ),
         (
-            A2AMessage::new_text(MessageRole::Agent, "协调多个Agent完成复杂任务"),
-            "autogen_agent_001", 
+            A2AMessage::new_text(MessageRole::Agent, "协调多个Agent完成复杂任务".to_string()),
+            "autogen_agent_001",
             "多Agent协调请求"
         ),
         (
-            A2AMessage::new_text(MessageRole::Agent, "执行数据处理工作流"),
+            A2AMessage::new_text(MessageRole::Agent, "执行数据处理工作流".to_string()),
             "mastra_agent_001",
             "工作流执行请求"
         ),
@@ -280,13 +364,13 @@ async fn demonstrate_message_routing(bridge: &PluginBridge) -> Result<(), Box<dy
     for (message, target_agent, description) in messages {
         println!("   📤 发送消息: {}", description);
         println!("     目标Agent: {}", target_agent);
-        println!("     消息ID: {}", message.id);
+        println!("     消息ID: {}", message.message_id);
         
         // 尝试路由消息（会失败，因为插件未实际运行）
         match bridge.route_message_to_plugin(message, target_agent).await {
             Ok(response) => {
                 if let Some(resp) = response {
-                    println!("     ✅ 收到响应: {}", resp.id);
+                    println!("     ✅ 收到响应: {}", resp.message_id);
                 } else {
                     println!("     ✅ 消息处理完成（无响应）");
                 }
