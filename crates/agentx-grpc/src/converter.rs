@@ -1,23 +1,208 @@
 //! A2A协议与gRPC消息转换器
-//! 
-//! 提供A2A协议类型和gRPC protobuf类型之间的概念性转换
+//!
+//! 提供A2A协议类型和gRPC protobuf类型之间的真实转换
 
 use crate::error::{GrpcError, GrpcResult};
+use crate::proto::{
+    A2aMessageRequest, AgentInfo as ProtoAgentInfo,
+    MessageType, AgentStatus as ProtoAgentStatus, TrustLevel as ProtoTrustLevel,
+};
 use agentx_a2a::{
     A2AMessage, MessageRole, MessagePart, TextPart,
     AgentCard, Capability, CapabilityType, Endpoint,
     AgentStatus, TrustLevel,
 };
+use prost_types::Timestamp;
+use std::collections::HashMap;
 use serde_json;
 
 /// A2A消息转换器
-/// 
-/// 注意：这是一个概念性实现，展示如何在A2A协议和gRPC之间进行转换
-/// 实际的gRPC实现需要完整的protobuf定义和代码生成
+///
+/// 提供A2A协议类型和gRPC protobuf类型之间的真实转换
 pub struct A2AConverter;
 
 impl A2AConverter {
-    /// 将A2A消息转换为JSON格式（模拟gRPC序列化）
+    /// 将A2A消息转换为gRPC请求
+    pub fn a2a_to_grpc_request(message: &A2AMessage) -> GrpcResult<A2aMessageRequest> {
+        let timestamp = Some(Timestamp {
+            seconds: chrono::Utc::now().timestamp(),
+            nanos: chrono::Utc::now().timestamp_subsec_nanos() as i32,
+        });
+
+        // 序列化消息内容为JSON
+        let payload_json = serde_json::to_string(&message.parts)
+            .map_err(|e| GrpcError::protocol_conversion(format!("序列化消息内容失败: {}", e)))?;
+
+        let payload = Some(prost_types::Any {
+            type_url: "type.googleapis.com/agentx.a2a.v1.MessageParts".to_string(),
+            value: payload_json.into_bytes(),
+        });
+
+        Ok(A2aMessageRequest {
+            message_id: message.message_id.clone(),
+            from_agent: "".to_string(), // A2A消息没有from字段，使用空字符串
+            to_agent: "".to_string(),   // A2A消息没有to字段，使用空字符串
+            message_type: Self::message_role_to_grpc_type(&message.role),
+            payload,
+            metadata: message.metadata.iter()
+                .map(|(k, v)| (k.clone(), v.to_string()))
+                .collect(),
+            timestamp,
+            ttl_seconds: 300, // 默认5分钟TTL
+        })
+    }
+
+    /// 将gRPC响应转换为A2A消息
+    pub fn grpc_response_to_a2a(response: A2aMessageRequest) -> GrpcResult<A2AMessage> {
+        let role = Self::grpc_type_to_message_role(response.message_type)?;
+
+        // 反序列化消息内容
+        let parts = if let Some(payload) = response.payload {
+            let payload_str = String::from_utf8(payload.value)
+                .map_err(|e| GrpcError::protocol_conversion(format!("解析payload失败: {}", e)))?;
+
+            serde_json::from_str::<Vec<MessagePart>>(&payload_str)
+                .map_err(|e| GrpcError::protocol_conversion(format!("反序列化消息内容失败: {}", e)))?
+        } else {
+            vec![MessagePart::Text(TextPart {
+                text: "空消息".to_string(),
+                metadata: HashMap::new(),
+            })]
+        };
+
+        Ok(A2AMessage {
+            message_id: response.message_id,
+            task_id: None,
+            context_id: None,
+            role,
+            parts,
+            metadata: response.metadata.into_iter()
+                .map(|(k, v)| (k, serde_json::Value::String(v)))
+                .collect(),
+        })
+    }
+
+    /// 将Agent Card转换为gRPC Agent Info
+    pub fn agent_card_to_grpc_info(card: &AgentCard) -> GrpcResult<ProtoAgentInfo> {
+        let created_at = Some(Timestamp {
+            seconds: card.created_at.timestamp(),
+            nanos: card.created_at.timestamp_subsec_nanos() as i32,
+        });
+
+        let updated_at = Some(Timestamp {
+            seconds: card.updated_at.timestamp(),
+            nanos: card.updated_at.timestamp_subsec_nanos() as i32,
+        });
+
+        Ok(ProtoAgentInfo {
+            id: card.id.clone(),
+            name: card.name.clone(),
+            description: card.description.clone(),
+            framework: "agentx".to_string(), // 默认框架
+            version: card.version.clone(),
+            status: Self::agent_status_to_grpc(card.status),
+            trust_level: Self::trust_level_to_grpc(card.trust_level),
+            tags: card.tags.clone(),
+            metadata: card.metadata.iter()
+                .map(|(k, v)| (k.clone(), v.to_string()))
+                .collect(),
+            created_at,
+            updated_at,
+        })
+    }
+
+    /// 将gRPC Agent Info转换为Agent Card
+    pub fn grpc_info_to_agent_card(info: ProtoAgentInfo) -> GrpcResult<AgentCard> {
+        let created_at = info.created_at
+            .map(|ts| chrono::DateTime::from_timestamp(ts.seconds, ts.nanos as u32))
+            .flatten()
+            .unwrap_or_else(chrono::Utc::now);
+
+        let updated_at = info.updated_at
+            .map(|ts| chrono::DateTime::from_timestamp(ts.seconds, ts.nanos as u32))
+            .flatten()
+            .unwrap_or_else(chrono::Utc::now);
+
+        Ok(AgentCard {
+            id: info.id,
+            name: info.name,
+            description: info.description,
+            version: info.version,
+            capabilities: Vec::new(), // 需要单独获取
+            endpoints: Vec::new(), // 需要单独获取
+            metadata: info.metadata.into_iter()
+                .map(|(k, v)| (k, serde_json::Value::String(v)))
+                .collect(),
+            created_at,
+            updated_at,
+            expires_at: None,
+            status: Self::grpc_to_agent_status(info.status)?,
+            supported_versions: vec!["0.2.5".to_string()],
+            tags: info.tags,
+            interaction_modalities: Vec::new(),
+            ux_capabilities: None,
+            trust_level: Self::grpc_to_trust_level(info.trust_level)?,
+            supported_task_types: Vec::new(),
+        })
+    }
+
+    // 私有转换方法
+
+    fn message_role_to_grpc_type(role: &MessageRole) -> i32 {
+        match role {
+            MessageRole::User => MessageType::Request as i32,
+            MessageRole::Agent => MessageType::Response as i32,
+        }
+    }
+
+    fn grpc_type_to_message_role(message_type: i32) -> GrpcResult<MessageRole> {
+        match MessageType::try_from(message_type) {
+            Ok(MessageType::Request) => Ok(MessageRole::User),
+            Ok(MessageType::Response) => Ok(MessageRole::Agent),
+            _ => Ok(MessageRole::Agent), // 默认为Agent
+        }
+    }
+
+    fn agent_status_to_grpc(status: AgentStatus) -> i32 {
+        match status {
+            AgentStatus::Online => ProtoAgentStatus::Online as i32,
+            AgentStatus::Offline => ProtoAgentStatus::Offline as i32,
+            AgentStatus::Busy => ProtoAgentStatus::Busy as i32,
+            AgentStatus::Maintenance => ProtoAgentStatus::Error as i32,
+            AgentStatus::Unknown => ProtoAgentStatus::Unspecified as i32,
+        }
+    }
+
+    fn grpc_to_agent_status(status: i32) -> GrpcResult<AgentStatus> {
+        match ProtoAgentStatus::try_from(status) {
+            Ok(ProtoAgentStatus::Online) => Ok(AgentStatus::Online),
+            Ok(ProtoAgentStatus::Offline) => Ok(AgentStatus::Offline),
+            Ok(ProtoAgentStatus::Busy) => Ok(AgentStatus::Busy),
+            Ok(ProtoAgentStatus::Error) => Ok(AgentStatus::Maintenance),
+            _ => Ok(AgentStatus::Unknown),
+        }
+    }
+
+    fn trust_level_to_grpc(trust: TrustLevel) -> i32 {
+        match trust {
+            TrustLevel::Public => ProtoTrustLevel::Public as i32,
+            TrustLevel::Verified => ProtoTrustLevel::Verified as i32,
+            TrustLevel::Trusted => ProtoTrustLevel::Trusted as i32,
+            TrustLevel::Internal => ProtoTrustLevel::Internal as i32,
+        }
+    }
+
+    fn grpc_to_trust_level(trust: i32) -> GrpcResult<TrustLevel> {
+        match ProtoTrustLevel::try_from(trust) {
+            Ok(ProtoTrustLevel::Public) => Ok(TrustLevel::Public),
+            Ok(ProtoTrustLevel::Verified) => Ok(TrustLevel::Verified),
+            Ok(ProtoTrustLevel::Trusted) => Ok(TrustLevel::Trusted),
+            Ok(ProtoTrustLevel::Internal) => Ok(TrustLevel::Internal),
+            _ => Ok(TrustLevel::Public),
+        }
+    }
+
+    /// 将A2A消息转换为JSON格式（向后兼容）
     pub fn message_to_json(message: &A2AMessage) -> GrpcResult<serde_json::Value> {
         let json = serde_json::json!({
             "message_id": message.message_id,
