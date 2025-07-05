@@ -4,13 +4,19 @@
 
 pub mod protocol_compat;
 pub mod cloud_native;
+pub mod helm_charts;
+pub mod cicd_pipeline;
 pub mod developer_ecosystem;
+pub mod debug_diagnostics;
+pub mod performance_analyzer;
 pub mod error_recovery;
 
 // 重新导出主要类型
 pub use protocol_compat::{ProtocolCompatManager, mcp, openai};
 pub use cloud_native::{CloudNativeManager, KubernetesConfig, DockerConfig, CloudProviderConfig};
 pub use developer_ecosystem::{DeveloperEcosystemManager, PluginMarketManager, CliToolManager};
+pub use debug_diagnostics::{DebugDiagnosticsManager, DiagnosticsConfig, SystemDiagnosticsReport};
+pub use performance_analyzer::{PerformanceAnalyzer, PerformanceConfig, BenchmarkResult};
 pub use error_recovery::{ErrorRecoveryManager, ErrorRecoveryConfig, ComponentStatus, ErrorType, RecoveryStrategy};
 
 /// AgentX核心版本
