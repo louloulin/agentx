@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 
 /// 支持的框架类型
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FrameworkType {
     /// LangChain (Python)
     LangChain,

@@ -13,6 +13,8 @@ pub mod utils;
 pub mod lifecycle;
 pub mod security;
 pub mod config_manager;
+pub mod message_converter;
+pub mod framework_manager;
 
 // 重新导出核心类型
 pub use agentx_a2a::{
@@ -48,6 +50,19 @@ pub use security::{
 pub use config_manager::{
     PluginConfigManager, PluginConfigEntry, ConfigValidator, ConfigManagerConfig,
     ConfigFormat, ValidationRule,
+};
+
+// 消息转换
+pub use message_converter::{
+    MessageConverter, ConversionStats, ConversionRule,
+    LangChainMessage, AutoGenMessage, MastraMessage, ToolCall, ToolFunction,
+};
+
+// 框架管理
+pub use framework_manager::{
+    FrameworkManager, FrameworkState, FrameworkStatus,
+    HealthStatus as FrameworkHealthStatus,
+    FrameworkManagerConfig, FrameworkInteractionResult,
 };
 
 pub use framework::{
