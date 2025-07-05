@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
-use tracing::{debug, info, warn, error};
+use tracing::{debug, info};
 
 /// 加密管理器
 pub struct EncryptionManager {

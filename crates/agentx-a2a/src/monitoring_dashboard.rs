@@ -2,12 +2,12 @@
 //! 
 //! 提供实时性能监控、指标可视化和告警功能
 
-use crate::monitoring::{MonitoringManager, MetricPoint, MetricType, HealthCheck, HealthStatus};
-use crate::{A2AError, A2AResult};
+use crate::monitoring::{MonitoringManager, HealthCheck};
+use crate::A2AResult;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use chrono::{DateTime, Utc, Duration};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// 监控面板
 pub struct MonitoringDashboard {
@@ -467,7 +467,7 @@ impl MonitoringDashboard {
         Ok(widget_data)
     }
 
-    fn collect_widget_specific_data(&self, widget: &Widget) -> A2AResult<WidgetData> {
+    fn collect_widget_specific_data(&self, _widget: &Widget) -> A2AResult<WidgetData> {
         // 模拟小部件数据收集
         let now = Utc::now();
         let mut data_points = Vec::new();
