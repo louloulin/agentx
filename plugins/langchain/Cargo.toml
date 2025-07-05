@@ -1,0 +1,56 @@
+[package]
+name = "agentx-langchain-plugin"
+version = "0.1.0"
+edition = "2021"
+description = "AgentX LangChain框架插件"
+authors = ["AgentX Team <team@agentx.dev>"]
+license = "Apache-2.0"
+repository = "https://github.com/agentx/agentx"
+
+[dependencies]
+# AgentX核心依赖
+agentx-grpc = { path = "../../crates/agentx-grpc" }
+agentx-a2a = { path = "../../crates/agentx-a2a" }
+agentx-sdk = { path = "../../crates/agentx-sdk" }
+
+# gRPC和异步
+tonic = "0.10"
+tokio = { version = "1.0", features = ["full"] }
+tokio-stream = "0.1"
+
+# 序列化和配置
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# HTTP客户端（用于调用Python LangChain服务）
+reqwest = { version = "0.11", features = ["json"] }
+
+# 日志和错误处理
+tracing = "0.1"
+tracing-subscriber = "0.3"
+anyhow = "1.0"
+thiserror = "1.0"
+
+# 时间和UUID
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# 配置管理
+config = "0.13"
+
+[dev-dependencies]
+tempfile = "3.0"
+wiremock = "0.5"
+
+[build-dependencies]
+tonic-build = "0.10"
+
+[[bin]]
+name = "langchain-plugin"
+path = "src/main.rs"
+
+[features]
+default = ["python-bridge"]
+python-bridge = []
+direct-integration = []
