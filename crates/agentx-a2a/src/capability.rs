@@ -240,7 +240,7 @@ impl CapabilityDiscovery {
     }
     
     /// Find a capability that matches the requirement
-    fn find_matching_capability(&self, agent_card: &AgentCard, requirement: &CapabilityRequirement) -> Option<&Capability> {
+    fn find_matching_capability<'a>(&self, agent_card: &'a AgentCard, requirement: &CapabilityRequirement) -> Option<&'a Capability> {
         agent_card.capabilities.iter().find(|capability| {
             // Check if capability is available
             if !capability.available {

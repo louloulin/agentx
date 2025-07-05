@@ -6,8 +6,9 @@
 use actix::prelude::*;
 use crate::{
     AgentCard, CapabilityQuery, CapabilityMatch, CapabilityDiscovery,
-    A2AError, A2AResult, AgentStatus
+    A2AError, A2AResult
 };
+use crate::agent_card::AgentStatus;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -111,7 +112,7 @@ pub struct AgentFilter {
 
 /// Message to get registry statistics
 #[derive(Message, Debug)]
-#[rtype(result = "RegistryStats")]
+#[rtype(result = "A2AResult<RegistryStats>")]
 pub struct GetRegistryStats;
 
 /// Message for periodic health check
@@ -227,10 +228,10 @@ impl AgentRegistryActor {
             }
         });
         
-        health_info.status = status;
+        health_info.status = status.clone();
         health_info.last_seen = Utc::now();
         health_info.response_time_ms = response_time_ms;
-        
+
         // Reset error count on successful health check
         if matches!(status, AgentStatus::Online) {
             health_info.error_count = 0;
@@ -298,8 +299,8 @@ impl Handler<UpdateAgentStatus> for AgentRegistryActor {
         debug!("Updating agent status: {} -> {:?}", msg.agent_id, msg.status);
         
         // Update health information
-        self.update_agent_health(&msg.agent_id, msg.status, msg.response_time_ms);
-        
+        self.update_agent_health(&msg.agent_id, msg.status.clone(), msg.response_time_ms);
+
         // Update agent card in discovery service if needed
         if let Some(mut agent_card) = self.discovery.get_agent(&msg.agent_id).cloned() {
             agent_card.status = msg.status;
@@ -378,10 +379,10 @@ impl Handler<ListAgents> for AgentRegistryActor {
 
 /// Handle GetRegistryStats
 impl Handler<GetRegistryStats> for AgentRegistryActor {
-    type Result = RegistryStats;
-    
+    type Result = A2AResult<RegistryStats>;
+
     fn handle(&mut self, _msg: GetRegistryStats, _ctx: &mut Self::Context) -> Self::Result {
-        self.stats.clone()
+        Ok(self.stats.clone())
     }
 }
 

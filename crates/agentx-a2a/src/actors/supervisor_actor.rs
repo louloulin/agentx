@@ -23,7 +23,7 @@ pub struct PluginSupervisorActor {
 }
 
 /// Plugin process information
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PluginProcess {
     pub id: String,
     pub name: String,
@@ -37,7 +37,7 @@ pub struct PluginProcess {
 }
 
 /// Plugin status
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PluginStatus {
     Starting,
     Running,

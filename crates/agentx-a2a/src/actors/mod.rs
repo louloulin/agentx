@@ -38,17 +38,5 @@ pub struct SystemStatus {
     pub memory_usage_mb: f64,
 }
 
-/// Actor supervision strategy
-pub fn default_supervisor_strategy() -> SupervisorStrategy {
-    SupervisorStrategy::Stop
-}
-
-/// Actor mailbox configuration for high-throughput scenarios
-pub fn high_throughput_mailbox() -> actix::dev::ToEnvelope<Self, <Self as Actor>::Message> 
-where 
-    Self: Actor,
-{
-    // This would be implemented with custom mailbox configuration
-    // For now, we'll use default mailbox
-    todo!("Implement high-throughput mailbox configuration")
-}
+// Actor supervision and mailbox configuration would be implemented here
+// when needed for specific use cases

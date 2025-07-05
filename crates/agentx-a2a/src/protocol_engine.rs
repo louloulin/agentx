@@ -6,7 +6,7 @@
 
 use crate::{
     A2AMessage, A2ATask, JsonRpcRequest, JsonRpcResponse, JsonRpcError,
-    MessageRole, TaskState, TaskStatus, methods, A2AError, A2AResult
+    MessageRole, TaskState, TaskStatus, methods, A2AError, A2AResult, AgentStatus
 };
 use chrono::Utc;
 use serde_json::Value;
@@ -39,13 +39,7 @@ pub struct AgentInfo {
     pub status: AgentStatus,
 }
 
-/// Agent status
-#[derive(Debug, Clone, PartialEq)]
-pub enum AgentStatus {
-    Online,
-    Offline,
-    Busy,
-}
+// AgentStatus is defined in agent_card.rs
 
 /// Protocol engine configuration
 #[derive(Debug, Clone)]
@@ -344,11 +338,11 @@ impl A2AProtocolEngine {
         match self.tasks.get_mut(task_id) {
             Some(task) => {
                 task.status = TaskStatus {
-                    state,
+                    state: state.clone(),
                     timestamp: Some(Utc::now()),
                     message: None,
                 };
-                
+
                 // Update statistics
                 match state {
                     TaskState::Completed => self.stats.completed_tasks += 1,

@@ -25,7 +25,7 @@ pub struct MetricsCollectorActor {
 }
 
 /// System metrics
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SystemMetrics {
     pub uptime_seconds: u64,
     pub memory_usage_mb: f64,
@@ -36,7 +36,7 @@ pub struct SystemMetrics {
 }
 
 /// Performance metrics
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PerformanceMetrics {
     pub average_response_time_ms: f64,
     pub p95_response_time_ms: f64,
@@ -75,24 +75,24 @@ pub struct RecordMetric {
 
 /// Message to get system metrics
 #[derive(Message, Debug)]
-#[rtype(result = "SystemMetrics")]
+#[rtype(result = "A2AResult<SystemMetrics>")]
 pub struct GetSystemMetrics;
 
 /// Message to get performance metrics
 #[derive(Message, Debug)]
-#[rtype(result = "PerformanceMetrics")]
+#[rtype(result = "A2AResult<PerformanceMetrics>")]
 pub struct GetPerformanceMetrics;
 
 /// Message to get custom metrics
 #[derive(Message, Debug)]
-#[rtype(result = "HashMap<String, MetricValue>")]
+#[rtype(result = "A2AResult<HashMap<String, MetricValue>>")]
 pub struct GetCustomMetrics {
     pub filter: Option<String>,
 }
 
 /// Message to get all metrics
 #[derive(Message, Debug)]
-#[rtype(result = "AllMetrics")]
+#[rtype(result = "A2AResult<AllMetrics>")]
 pub struct GetAllMetrics;
 
 /// All metrics response
@@ -288,28 +288,28 @@ impl Handler<RecordMetric> for MetricsCollectorActor {
 
 /// Handle GetSystemMetrics
 impl Handler<GetSystemMetrics> for MetricsCollectorActor {
-    type Result = SystemMetrics;
-    
+    type Result = A2AResult<SystemMetrics>;
+
     fn handle(&mut self, _msg: GetSystemMetrics, _ctx: &mut Self::Context) -> Self::Result {
-        self.system_metrics.clone()
+        Ok(self.system_metrics.clone())
     }
 }
 
 /// Handle GetPerformanceMetrics
 impl Handler<GetPerformanceMetrics> for MetricsCollectorActor {
-    type Result = PerformanceMetrics;
-    
+    type Result = A2AResult<PerformanceMetrics>;
+
     fn handle(&mut self, _msg: GetPerformanceMetrics, _ctx: &mut Self::Context) -> Self::Result {
-        self.performance_metrics.clone()
+        Ok(self.performance_metrics.clone())
     }
 }
 
 /// Handle GetCustomMetrics
 impl Handler<GetCustomMetrics> for MetricsCollectorActor {
-    type Result = HashMap<String, MetricValue>;
-    
+    type Result = A2AResult<HashMap<String, MetricValue>>;
+
     fn handle(&mut self, msg: GetCustomMetrics, _ctx: &mut Self::Context) -> Self::Result {
-        if let Some(filter) = msg.filter {
+        Ok(if let Some(filter) = msg.filter {
             self.custom_metrics
                 .iter()
                 .filter(|(name, _)| name.contains(&filter))
@@ -317,21 +317,21 @@ impl Handler<GetCustomMetrics> for MetricsCollectorActor {
                 .collect()
         } else {
             self.custom_metrics.clone()
-        }
+        })
     }
 }
 
 /// Handle GetAllMetrics
 impl Handler<GetAllMetrics> for MetricsCollectorActor {
-    type Result = AllMetrics;
-    
+    type Result = A2AResult<AllMetrics>;
+
     fn handle(&mut self, _msg: GetAllMetrics, _ctx: &mut Self::Context) -> Self::Result {
-        AllMetrics {
+        Ok(AllMetrics {
             system: self.system_metrics.clone(),
             performance: self.performance_metrics.clone(),
             custom: self.custom_metrics.clone(),
             timestamp: chrono::Utc::now(),
-        }
+        })
     }
 }
 
