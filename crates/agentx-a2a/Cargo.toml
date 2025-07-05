@@ -62,3 +62,7 @@ path = "../../examples/a2a_enhanced_demo.rs"
 [[example]]
 name = "a2a_advanced_features_demo"
 path = "../../examples/a2a_advanced_features_demo.rs"
+
+[[example]]
+name = "a2a_complete_demo"
+path = "../../examples/a2a_complete_demo.rs"
