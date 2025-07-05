@@ -3,13 +3,13 @@
 //! 提供多种负载均衡策略和目标选择算法
 
 use crate::config::LoadBalancerConfig;
-use crate::error::{ClusterError, ClusterResult};
+use crate::error::ClusterResult;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn};
+use tracing::{info, debug};
 
 /// 负载均衡策略
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -359,7 +359,7 @@ impl LoadBalancer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    
     
     #[tokio::test]
     async fn test_load_balancer_creation() {

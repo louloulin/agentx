@@ -3,13 +3,13 @@
 //! 管理集群中的节点信息、状态和生命周期
 
 use crate::config::NodeConfig;
-use crate::error::{ClusterError, ClusterResult};
+use crate::error::ClusterResult;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug, warn};
 use uuid::Uuid;
 
 /// 节点状态
@@ -348,7 +348,7 @@ impl NodeManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    
     
     #[tokio::test]
     async fn test_node_manager_creation() {

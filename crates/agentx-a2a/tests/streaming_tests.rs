@@ -3,8 +3,8 @@
 //! 测试A2A协议的流式消息传输功能
 
 use agentx_a2a::{
-    StreamManager, StreamHeader, StreamChunk, StreamType, StreamState,
-    StreamMessageBuilder, A2AMessage, MessageRole,
+    StreamManager, StreamChunk, StreamType, StreamState,
+    StreamMessageBuilder,
 };
 use std::collections::HashMap;
 use tokio;

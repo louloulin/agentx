@@ -4,7 +4,7 @@
 
 use agentx_sdk::{
     init_sdk, PluginBuilder, FrameworkBuilder, ConfigBuilder,
-    FrameworkType, PluginCapability, PluginUtils, FrameworkUtils,
+    FrameworkType, PluginCapability, FrameworkUtils,
     A2AMessage, MessageRole, A2AResult,
 };
 use std::collections::HashMap;

@@ -9,7 +9,7 @@ use axum::{
 };
 use validator::Validate;
 use std::sync::Arc;
-use agentx_a2a::{A2AProtocolEngine, A2ATask, A2AMessage, JsonRpcRequest, TaskState, MessagePart, FileData, FileWithBytes, FileWithUri};
+use agentx_a2a::{A2ATask, A2AMessage, JsonRpcRequest, MessagePart, FileData, FileWithBytes};
 
 use crate::{
     models::*,

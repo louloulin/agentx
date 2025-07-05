@@ -7,15 +7,13 @@ use crate::proto::{
     A2aMessageRequest, A2aStreamChunk, InitializeRequest,
 };
 use agentx_a2a::{
-    A2AMessage, A2AProtocolEngine, AgentCard, StreamManager, StreamChunk, StreamType,
+    A2AMessage, A2AProtocolEngine, StreamManager, StreamChunk, StreamType,
     SecurityManager, MonitoringManager, A2AResult, A2AError,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{RwLock, mpsc};
-use tonic::{Request, Response, Status, Streaming};
-use uuid::Uuid;
-use chrono::Utc;
+use tonic::Request;
 
 /// gRPC插件桥接器
 pub struct PluginBridge {

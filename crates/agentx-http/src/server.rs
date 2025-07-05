@@ -4,7 +4,6 @@
 
 use axum::{
     extract::DefaultBodyLimit,
-    http::Method,
     middleware,
     response::Json,
     routing::{delete, get, post},
@@ -12,9 +11,8 @@ use axum::{
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tower::ServiceBuilder;
 use tower_http::timeout::TimeoutLayer;
-use tracing::{info, error};
+use tracing::info;
 
 use agentx_a2a::{A2AProtocolEngine, ProtocolEngineConfig};
 

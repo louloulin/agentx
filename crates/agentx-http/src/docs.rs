@@ -10,7 +10,6 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
     models::*,
-    error::ErrorResponse,
     handlers::{tasks, messages, agents, health},
 };
 

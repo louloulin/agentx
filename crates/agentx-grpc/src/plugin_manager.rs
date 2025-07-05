@@ -2,13 +2,12 @@
 //! 
 //! 管理gRPC插件的生命周期、健康检查和负载均衡
 
-use crate::plugin_bridge::{PluginBridge, PluginInfo, PluginStatus};
-use agentx_a2a::{A2AResult, A2AError, A2AMessage, StreamChunk};
+use crate::plugin_bridge::{PluginBridge, PluginStatus};
+use agentx_a2a::{A2AResult, A2AError, A2AMessage};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{RwLock, mpsc};
 use tokio::time::{interval, Duration};
-use uuid::Uuid;
 
 /// 插件管理器
 pub struct PluginManager {

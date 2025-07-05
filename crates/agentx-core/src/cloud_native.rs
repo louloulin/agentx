@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use agentx_a2a::{A2AResult, A2AError};
+use agentx_a2a::A2AResult;
 
 /// Kubernetes部署配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

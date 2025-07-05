@@ -90,6 +90,7 @@ pub struct StreamManager {
     /// 消息发送器
     message_sender: mpsc::UnboundedSender<A2AMessage>,
     /// 消息接收器
+    #[allow(dead_code)]
     message_receiver: Option<mpsc::UnboundedReceiver<A2AMessage>>,
 }
 

@@ -353,7 +353,7 @@ fn default_max_results() -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AgentCard, Capability, CapabilityType, AgentStatus};
+    use crate::{AgentCard, Capability, CapabilityType};
 
     #[test]
     fn test_capability_discovery() {

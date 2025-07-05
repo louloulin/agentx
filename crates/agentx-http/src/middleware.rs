@@ -4,7 +4,7 @@
 
 use axum::{
     extract::Request,
-    http::{HeaderMap, StatusCode},
+    http::HeaderMap,
     middleware::Next,
     response::Response,
 };
@@ -15,10 +15,7 @@ use tower_http::{
 };
 use tracing::{info, warn};
 
-use crate::{
-    config::HttpServerConfig,
-    error::{HttpApiError, HttpApiResult},
-};
+use crate::error::HttpApiError;
 
 /// 创建CORS中间件
 pub fn cors_middleware() -> CorsLayer {

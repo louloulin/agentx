@@ -5,7 +5,7 @@
 use agentx_sdk::{
     init_sdk, PluginBuilder, FrameworkBuilder, ConfigBuilder,
     FrameworkType, PluginCapability, FrameworkUtils, PluginUtils,
-    A2AMessage, MessageRole, A2AResult,
+    A2AMessage,
 };
 use std::collections::HashMap;
 use tokio;

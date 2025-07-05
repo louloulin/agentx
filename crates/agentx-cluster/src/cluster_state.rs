@@ -9,7 +9,7 @@ use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug, warn};
 
 /// 集群状态
 #[derive(Debug, Clone, Serialize, Deserialize)]

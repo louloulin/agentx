@@ -9,7 +9,7 @@ use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug};
 
 /// 服务发现后端类型
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

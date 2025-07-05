@@ -10,7 +10,6 @@
 use std::time::{Duration, Instant};
 use std::sync::Arc;
 use tokio::sync::{RwLock, Semaphore};
-use tokio::time::timeout;
 use agentx_a2a::{
     A2AProtocolEngine, ProtocolEngineConfig, AgentInfo, AgentStatus,
     A2AMessage, MessageRole,

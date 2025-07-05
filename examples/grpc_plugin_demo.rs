@@ -8,10 +8,9 @@ use agentx_a2a::{
     A2AProtocolEngine, ProtocolEngineConfig,
 };
 use agentx_grpc::{
-    GrpcError, GrpcResult,
+    GrpcResult,
     A2AConverter,
 };
-use std::collections::HashMap;
 use tokio;
 
 #[tokio::main]
@@ -22,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. 初始化A2A协议引擎
     println!("\n⚙️ 1. 初始化A2A协议引擎");
     let config = ProtocolEngineConfig::default();
-    let mut engine = A2AProtocolEngine::new(config);
+    let engine = A2AProtocolEngine::new(config);
     println!("   ✅ A2A协议引擎初始化完成");
     
     // 2. 创建测试Agent

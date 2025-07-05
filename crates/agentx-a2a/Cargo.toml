@@ -56,13 +56,13 @@ tokio-test = "0.4"
 mockall.workspace = true
 
 [[example]]
-name = "a2a_enhanced_demo"
+name = "a2a_enhanced_demo_lib"
 path = "../../examples/a2a_enhanced_demo.rs"
 
 [[example]]
-name = "a2a_advanced_features_demo"
+name = "a2a_advanced_features_demo_lib"
 path = "../../examples/a2a_advanced_features_demo.rs"
 
 [[example]]
-name = "a2a_complete_demo"
+name = "a2a_complete_demo_lib"
 path = "../../examples/a2a_complete_demo.rs"

@@ -64,17 +64,17 @@ csharp = []
 go = []
 
 [[example]]
-name = "plugin_sdk_demo"
+name = "plugin_sdk_demo_lib"
 path = "../../examples/plugin_sdk_demo.rs"
 
 [[example]]
-name = "langchain_plugin_demo"
+name = "langchain_plugin_demo_lib"
 path = "../../examples/langchain_plugin_demo.rs"
 
 [[example]]
-name = "autogen_plugin_demo"
+name = "autogen_plugin_demo_lib"
 path = "../../examples/autogen_plugin_demo.rs"
 
 [[example]]
-name = "mastra_plugin_demo"
+name = "mastra_plugin_demo_lib"
 path = "../../examples/mastra_plugin_demo.rs"

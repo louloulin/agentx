@@ -11,9 +11,7 @@ use agentx_a2a::{
     // 安全认证
     SecurityManager, SecurityConfig, AuthCredentials, AuthType, TrustLevel,
     // 监控
-    MonitoringManager, MonitoringConfig, MetricPoint, MetricType,
-    // 基础类型
-    A2AMessage, MessageRole,
+    MonitoringManager, MonitoringConfig,
 };
 use std::collections::HashMap;
 use chrono::Utc;

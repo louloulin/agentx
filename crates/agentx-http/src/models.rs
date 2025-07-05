@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use validator::Validate;
-use agentx_a2a::{A2AMessage, A2ATask, MessageRole, TaskState, AgentStatus};
+use agentx_a2a::{MessageRole, TaskState, AgentStatus};
 
 /// 创建任务请求
 #[derive(Serialize, Deserialize, Debug, Validate, ToSchema)]

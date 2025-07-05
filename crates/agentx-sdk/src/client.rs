@@ -312,7 +312,7 @@ mod tests {
     
     #[test]
     fn test_connection_manager() {
-        let mut manager = ConnectionManager::new();
+        let manager = ConnectionManager::new();
         assert_eq!(manager.list_connections().len(), 0);
         
         // 测试连接管理基本功能

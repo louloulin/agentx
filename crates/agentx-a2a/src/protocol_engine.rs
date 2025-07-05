@@ -5,14 +5,11 @@
 //! to the A2A protocol specification v0.2.5.
 
 use crate::{
-    A2AMessage, A2ATask, JsonRpcRequest, JsonRpcResponse, JsonRpcError,
-    MessageRole, TaskState, TaskStatus, methods, A2AError, A2AResult, AgentStatus
+    A2AMessage, A2ATask, JsonRpcRequest, JsonRpcResponse, JsonRpcError, TaskState, TaskStatus, methods, A2AError, A2AResult, AgentStatus
 };
 use chrono::Utc;
-use serde_json::Value;
 use std::collections::HashMap;
 use tracing::{debug, error, info, warn};
-use uuid::Uuid;
 
 /// A2A Protocol Engine - Core implementation of A2A protocol
 pub struct A2AProtocolEngine {

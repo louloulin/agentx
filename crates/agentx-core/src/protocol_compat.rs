@@ -2,10 +2,9 @@
 //! 
 //! 提供与MCP、OpenAI Assistant API等主流协议的兼容性支持
 
-use agentx_a2a::{A2AMessage, A2AResult, A2AError, MessageRole};
+use agentx_a2a::{A2AMessage, A2AResult, MessageRole};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use async_trait::async_trait;
 
 /// MCP (Model Context Protocol) 兼容层
 pub mod mcp {

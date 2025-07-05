@@ -9,7 +9,6 @@ use agentx_a2a::{
     AgentStatus, TrustLevel,
 };
 use serde_json;
-use std::collections::HashMap;
 
 /// A2A消息转换器
 /// 

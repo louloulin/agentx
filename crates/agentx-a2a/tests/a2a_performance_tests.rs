@@ -17,7 +17,7 @@ async fn test_message_processing_latency() {
     println!("🧪 测试消息处理延迟 (目标: <10ms)");
     
     let config = ProtocolEngineConfig::default();
-    let mut engine = A2AProtocolEngine::new(config);
+    let engine = A2AProtocolEngine::new(config);
     
     let message_count = 1000;
     let mut total_latency = 0u128;

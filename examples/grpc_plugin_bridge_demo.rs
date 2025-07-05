@@ -3,7 +3,7 @@
 //! 展示AgentX中gRPC插件系统与A2A协议的桥接功能
 
 use agentx_grpc::{
-    PluginBridge, PluginManager, PluginConfig, AgentXGrpcServer, ServerConfig,
+    PluginBridge, PluginManager, PluginConfig,
 };
 use agentx_a2a::{
     A2AProtocolEngine, ProtocolEngineConfig, StreamManager, SecurityManager, SecurityConfig, MonitoringManager,

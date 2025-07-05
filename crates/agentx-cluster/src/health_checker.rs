@@ -8,7 +8,7 @@ use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug, warn};
 
 /// 健康状态
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -7,8 +7,8 @@
 
 use agentx_a2a::{
     AgentCard, AgentInfo, AgentStatus, Capability, CapabilityType, Endpoint,
-    InteractionModality, UxCapabilities, TrustLevel,
-    A2AMessage, MessageRole, MessagePart, FileData, FileWithBytes,
+    InteractionModality, TrustLevel,
+    A2AMessage, MessageRole, FileData, FileWithBytes,
     A2AProtocolEngine, ProtocolEngineConfig,
 };
 use std::time::{Duration, Instant};
@@ -20,7 +20,7 @@ async fn test_message_routing_latency() {
     println!("🚀 测试A2A消息路由延迟");
     
     let config = ProtocolEngineConfig::default();
-    let mut engine = A2AProtocolEngine::new(config);
+    let engine = A2AProtocolEngine::new(config);
     
     // 创建测试消息
     let message = A2AMessage::new_text(
@@ -69,7 +69,7 @@ async fn test_message_throughput() {
     println!("🚀 测试A2A消息吞吐量");
     
     let config = ProtocolEngineConfig::default();
-    let mut engine = A2AProtocolEngine::new(config);
+    let engine = A2AProtocolEngine::new(config);
     
     // 创建不同类型的测试消息
     let text_message = A2AMessage::new_text(

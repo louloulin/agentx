@@ -3,7 +3,6 @@
 //! 展示协议兼容、云原生部署和开发者生态系统的完整功能
 
 use agentx_core::*;
-use agentx_a2a::*;
 use serde_json;
 use std::collections::HashMap;
 
