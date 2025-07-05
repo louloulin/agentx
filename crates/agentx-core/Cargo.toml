@@ -1,0 +1,44 @@
+[package]
+name = "agentx-core"
+version = "0.1.0"
+edition = "2021"
+description = "AgentX核心库 - 协议兼容、云原生部署和开发者生态系统"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/agentx/agentx"
+keywords = ["ai", "agent", "a2a", "grpc", "microkernel"]
+categories = ["development-tools", "api-bindings"]
+
+[dependencies]
+# AgentX依赖
+agentx-a2a = { path = "../agentx-a2a" }
+
+# 异步运行时
+tokio = { version = "1.0", features = ["full"] }
+async-trait = "0.1"
+
+# 序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 时间处理
+chrono = { version = "0.4", features = ["serde"] }
+
+# 日志
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# 错误处理
+thiserror = "1.0"
+anyhow = "1.0"
+
+# 网络和HTTP
+reqwest = { version = "0.11", features = ["json"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[features]
+default = ["protocol-compat", "cloud-native", "developer-ecosystem"]
+protocol-compat = []
+cloud-native = []
+developer-ecosystem = []

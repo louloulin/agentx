@@ -10,6 +10,7 @@ use agentx_a2a::*;
 use serde_json;
 use std::time::Instant;
 use tokio;
+use base64::Engine;
 
 #[tokio::test]
 async fn test_a2a_message_format_compliance() {
@@ -319,7 +320,7 @@ async fn test_file_and_data_parts() {
     let file_data = FileData::WithBytes(FileWithBytes {
         name: Some("test.txt".to_string()),
         mime_type: "text/plain".to_string(),
-        bytes: base64::encode("Hello, World!"),
+        bytes: base64::engine::general_purpose::STANDARD.encode("Hello, World!"),
     });
     
     let file_message = A2AMessage::new_file(MessageRole::User, file_data);
@@ -368,5 +369,5 @@ fn print_performance_summary(test_name: &str, message_count: usize, total_time_m
     println!("   平均时间: {:.2}ms", total_time_ms as f64 / message_count as f64);
     println!("   吞吐量: {:.2} 消息/秒", 
              (message_count as f64) / (total_time_ms as f64 / 1000.0));
-    println!("   目标达成: {}", if total_time_ms / message_count as u128 < 10 { "✅" } else { "❌" });
+    println!("   目标达成: {}", if (total_time_ms / message_count as u128) < 10 { "✅" } else { "❌" });
 }

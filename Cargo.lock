@@ -263,6 +263,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "agentx-core"
+version = "0.1.0"
+dependencies = [
+ "agentx-a2a",
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "agentx-grpc"
 version = "0.1.0"
 dependencies = [
