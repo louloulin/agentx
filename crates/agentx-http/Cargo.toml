@@ -11,7 +11,7 @@ agentx-a2a = { path = "../agentx-a2a" }
 
 # Web框架
 axum = "0.7"
-tower = "0.4"
+tower = { version = "0.4", features = ["util"] }
 tower-http = { version = "0.5", features = ["cors", "trace", "compression-gzip", "timeout"] }
 
 # 异步运行时

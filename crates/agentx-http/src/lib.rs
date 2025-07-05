@@ -10,6 +10,7 @@ pub mod models;
 pub mod error;
 pub mod config;
 pub mod docs;
+pub mod response;
 
 pub use server::*;
 pub use handlers::*;
@@ -18,6 +19,7 @@ pub use models::*;
 pub use error::*;
 pub use config::*;
 pub use docs::*;
+pub use response::*;
 
 /// HTTP API版本
 pub const API_VERSION: &str = "v1";

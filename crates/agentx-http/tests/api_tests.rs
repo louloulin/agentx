@@ -7,7 +7,7 @@ use axum::{
     http::{Request, StatusCode},
 };
 use serde_json;
-use tower::ServiceExt;
+use tower::util::ServiceExt;
 use agentx_http::{
     config::AppConfig,
     server::HttpServer,
@@ -36,7 +36,7 @@ async fn test_health_check() {
     
     assert_eq!(response.status(), StatusCode::OK);
     
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let health_response: HealthResponse = serde_json::from_slice(&body).unwrap();
     
     assert_eq!(health_response.status, "healthy");
@@ -60,7 +60,7 @@ async fn test_readiness_check() {
     
     assert_eq!(response.status(), StatusCode::OK);
     
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let health_response: HealthResponse = serde_json::from_slice(&body).unwrap();
     
     assert_eq!(health_response.status, "ready");
@@ -83,7 +83,7 @@ async fn test_liveness_check() {
     
     assert_eq!(response.status(), StatusCode::OK);
     
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let health_response: HealthResponse = serde_json::from_slice(&body).unwrap();
     
     assert_eq!(health_response.status, "alive");
@@ -123,7 +123,7 @@ async fn test_create_task() {
     
     assert_eq!(response.status(), StatusCode::CREATED);
     
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let task_response: TaskResponse = serde_json::from_slice(&body).unwrap();
     
     assert_eq!(task_response.kind, "test_task");
@@ -159,7 +159,7 @@ async fn test_register_agent() {
     
     assert_eq!(response.status(), StatusCode::CREATED);
     
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let agent_response: AgentResponse = serde_json::from_slice(&body).unwrap();
     
     assert_eq!(agent_response.id, "test_agent");
@@ -196,7 +196,7 @@ async fn test_send_message() {
     
     assert_eq!(response.status(), StatusCode::CREATED);
     
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let message_response: MessageResponse = serde_json::from_slice(&body).unwrap();
     
     assert_eq!(message_response.role, agentx_a2a::MessageRole::User);
@@ -228,7 +228,7 @@ async fn test_get_capabilities() {
     
     assert_eq!(response.status(), StatusCode::OK);
     
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let capabilities: serde_json::Value = serde_json::from_slice(&body).unwrap();
     
     // 验证返回的是有效的JSON

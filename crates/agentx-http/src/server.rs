@@ -20,7 +20,7 @@ use agentx_a2a::{A2AProtocolEngine, ProtocolEngineConfig};
 
 use crate::{
     config::{HttpServerConfig, AppConfig},
-    handlers::{tasks, messages, agents, health},
+    handlers::{tasks, messages, agents, health, metrics, openapi},
     middleware::*,
     docs::ApiDoc,
     error::HttpApiResult,
@@ -100,6 +100,19 @@ impl HttpServer {
             .route("/agents/:agent_id", get(agents::get_agent))
             .route("/agents/:agent_id", delete(agents::unregister_agent))
             .route("/agents/capabilities", get(agents::get_capabilities))
+
+            // 指标和监控路由
+            .route("/metrics", get(metrics::get_metrics))
+            .route("/metrics/prometheus", get(metrics::get_prometheus_metrics))
+            .route("/metrics/health", get(metrics::get_health_metrics))
+            .route("/metrics/performance", get(metrics::get_performance_stats))
+            .route("/metrics/reset", post(metrics::reset_metrics))
+
+            // OpenAPI文档路由
+            .route("/openapi.json", get(openapi::get_openapi_spec))
+            .route("/docs", get(openapi::get_swagger_ui))
+            .route("/redoc", get(openapi::get_redoc))
+            .route("/openapi/download", get(openapi::download_openapi_spec))
             
             .with_state(self.state.clone());
         
@@ -117,10 +130,9 @@ impl HttpServer {
             
             .with_state(self.state.clone());
         
-        // 添加OpenAPI文档
+        // 添加OpenAPI文档（如果启用）
         if self.config.enable_docs {
             app = app.merge(ApiDoc::swagger_ui());
-            app = app.route("/api-docs/openapi.json", get(Self::openapi_handler));
         }
         
         app

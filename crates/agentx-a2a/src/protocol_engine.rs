@@ -322,6 +322,16 @@ impl A2AProtocolEngine {
         info!("Unregistering agent: {}", agent_id);
         self.agents.remove(agent_id);
     }
+
+    /// Get list of all registered agents
+    pub fn list_agents(&self) -> Vec<AgentInfo> {
+        self.agents.values().cloned().collect()
+    }
+
+    /// Get agent by ID
+    pub fn get_agent(&self, agent_id: &str) -> Option<&AgentInfo> {
+        self.agents.get(agent_id)
+    }
     
     /// Get engine statistics
     pub fn get_stats(&self) -> &EngineStats {
