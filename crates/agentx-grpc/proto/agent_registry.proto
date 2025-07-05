@@ -1,0 +1,235 @@
+syntax = "proto3";
+
+package agentx.registry.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+// Agent注册服务
+service AgentRegistryService {
+  // 注册Agent
+  rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);
+  
+  // 注销Agent
+  rpc UnregisterAgent(UnregisterAgentRequest) returns (UnregisterAgentResponse);
+  
+  // 更新Agent状态
+  rpc UpdateAgentStatus(UpdateAgentStatusRequest) returns (UpdateAgentStatusResponse);
+  
+  // 获取Agent信息
+  rpc GetAgent(GetAgentRequest) returns (GetAgentResponse);
+  
+  // 列出Agent
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+  
+  // 发现Agent
+  rpc DiscoverAgents(DiscoverAgentsRequest) returns (DiscoverAgentsResponse);
+  
+  // Agent心跳
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  
+  // 获取Agent能力
+  rpc GetCapabilities(GetCapabilitiesRequest) returns (GetCapabilitiesResponse);
+}
+
+// Agent Card定义
+message AgentCard {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string version = 4;
+  repeated Capability capabilities = 5;
+  repeated Endpoint endpoints = 6;
+  google.protobuf.Struct metadata = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  optional google.protobuf.Timestamp expires_at = 10;
+  AgentStatus status = 11;
+  repeated string supported_versions = 12;
+  repeated string tags = 13;
+  repeated InteractionModality interaction_modalities = 14;
+  optional UxCapabilities ux_capabilities = 15;
+  TrustLevel trust_level = 16;
+  repeated string supported_task_types = 17;
+}
+
+// Agent能力
+message Capability {
+  string name = 1;
+  string description = 2;
+  CapabilityType type = 3;
+  bool available = 4;
+  optional google.protobuf.Struct input_schema = 5;
+  optional google.protobuf.Struct output_schema = 6;
+  google.protobuf.Struct metadata = 7;
+}
+
+// 能力类型
+enum CapabilityType {
+  CAPABILITY_TYPE_UNSPECIFIED = 0;
+  CAPABILITY_TYPE_TEXT_GENERATION = 1;
+  CAPABILITY_TYPE_IMAGE_PROCESSING = 2;
+  CAPABILITY_TYPE_AUDIO_PROCESSING = 3;
+  CAPABILITY_TYPE_VIDEO_PROCESSING = 4;
+  CAPABILITY_TYPE_DATA_ANALYSIS = 5;
+  CAPABILITY_TYPE_CODE_EXECUTION = 6;
+  CAPABILITY_TYPE_FILE_PROCESSING = 7;
+  CAPABILITY_TYPE_WEB_SEARCH = 8;
+  CAPABILITY_TYPE_CUSTOM = 9;
+}
+
+// Agent端点
+message Endpoint {
+  string type = 1;
+  string url = 2;
+  optional string protocol = 3;
+  optional AuthInfo auth = 4;
+  google.protobuf.Struct metadata = 5;
+}
+
+// 认证信息
+message AuthInfo {
+  string auth_type = 1;
+  google.protobuf.Struct parameters = 2;
+}
+
+// Agent状态
+enum AgentStatus {
+  AGENT_STATUS_UNSPECIFIED = 0;
+  AGENT_STATUS_ONLINE = 1;
+  AGENT_STATUS_OFFLINE = 2;
+  AGENT_STATUS_BUSY = 3;
+  AGENT_STATUS_MAINTENANCE = 4;
+  AGENT_STATUS_ERROR = 5;
+}
+
+// 交互模式
+enum InteractionModality {
+  INTERACTION_MODALITY_UNSPECIFIED = 0;
+  INTERACTION_MODALITY_TEXT = 1;
+  INTERACTION_MODALITY_FORMS = 2;
+  INTERACTION_MODALITY_MEDIA = 3;
+  INTERACTION_MODALITY_FILES = 4;
+  INTERACTION_MODALITY_STREAMING = 5;
+  INTERACTION_MODALITY_CUSTOM = 6;
+}
+
+// UX能力
+message UxCapabilities {
+  repeated string supported_components = 1;
+  bool dynamic_adaptation = 2;
+  bool multimodal_support = 3;
+  repeated string custom_protocols = 4;
+}
+
+// 信任级别
+enum TrustLevel {
+  TRUST_LEVEL_UNSPECIFIED = 0;
+  TRUST_LEVEL_PUBLIC = 1;
+  TRUST_LEVEL_VERIFIED = 2;
+  TRUST_LEVEL_TRUSTED = 3;
+  TRUST_LEVEL_INTERNAL = 4;
+}
+
+// 注册Agent请求
+message RegisterAgentRequest {
+  AgentCard agent_card = 1;
+}
+
+// 注册Agent响应
+message RegisterAgentResponse {
+  bool success = 1;
+  string agent_id = 2;
+  optional string error_message = 3;
+}
+
+// 注销Agent请求
+message UnregisterAgentRequest {
+  string agent_id = 1;
+  optional string reason = 2;
+}
+
+// 注销Agent响应
+message UnregisterAgentResponse {
+  bool success = 1;
+  optional string message = 2;
+}
+
+// 更新Agent状态请求
+message UpdateAgentStatusRequest {
+  string agent_id = 1;
+  AgentStatus status = 2;
+  optional string message = 3;
+}
+
+// 更新Agent状态响应
+message UpdateAgentStatusResponse {
+  bool success = 1;
+  optional string error_message = 2;
+}
+
+// 获取Agent请求
+message GetAgentRequest {
+  string agent_id = 1;
+}
+
+// 获取Agent响应
+message GetAgentResponse {
+  AgentCard agent_card = 1;
+}
+
+// 列出Agent请求
+message ListAgentsRequest {
+  optional AgentStatus status_filter = 1;
+  optional string capability_filter = 2;
+  optional TrustLevel trust_level_filter = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+
+// 列出Agent响应
+message ListAgentsResponse {
+  repeated AgentCard agents = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+// 发现Agent请求
+message DiscoverAgentsRequest {
+  repeated string required_capabilities = 1;
+  optional TrustLevel min_trust_level = 2;
+  repeated InteractionModality required_modalities = 3;
+  repeated string task_types = 4;
+  google.protobuf.Struct filters = 5;
+}
+
+// 发现Agent响应
+message DiscoverAgentsResponse {
+  repeated AgentCard matching_agents = 1;
+  int32 total_matches = 2;
+}
+
+// 心跳请求
+message HeartbeatRequest {
+  string agent_id = 1;
+  AgentStatus status = 2;
+  google.protobuf.Struct metrics = 3;
+}
+
+// 心跳响应
+message HeartbeatResponse {
+  bool acknowledged = 1;
+  optional string message = 2;
+}
+
+// 获取能力请求
+message GetCapabilitiesRequest {
+  optional string agent_id = 1;
+  optional CapabilityType capability_type = 2;
+}
+
+// 获取能力响应
+message GetCapabilitiesResponse {
+  repeated Capability capabilities = 1;
+  google.protobuf.Struct system_capabilities = 2;
+}

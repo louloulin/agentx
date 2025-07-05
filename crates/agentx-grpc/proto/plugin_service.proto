@@ -1,0 +1,166 @@
+syntax = "proto3";
+
+package agentx.plugin.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "a2a_service.proto";
+
+// 插件服务定义
+service PluginService {
+  // 注册插件
+  rpc RegisterPlugin(RegisterPluginRequest) returns (RegisterPluginResponse);
+  
+  // 注销插件
+  rpc UnregisterPlugin(UnregisterPluginRequest) returns (UnregisterPluginResponse);
+  
+  // 获取插件信息
+  rpc GetPluginInfo(GetPluginInfoRequest) returns (GetPluginInfoResponse);
+  
+  // 列出所有插件
+  rpc ListPlugins(ListPluginsRequest) returns (ListPluginsResponse);
+  
+  // 插件健康检查
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+  
+  // 插件配置更新
+  rpc UpdateConfig(UpdateConfigRequest) returns (UpdateConfigResponse);
+  
+  // 插件消息处理
+  rpc ProcessMessage(ProcessMessageRequest) returns (ProcessMessageResponse);
+}
+
+// 插件信息
+message PluginInfo {
+  string id = 1;
+  string name = 2;
+  string version = 3;
+  string description = 4;
+  PluginType type = 5;
+  PluginStatus status = 6;
+  repeated string capabilities = 7;
+  repeated string supported_frameworks = 8;
+  google.protobuf.Struct metadata = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+// 插件类型
+enum PluginType {
+  PLUGIN_TYPE_UNSPECIFIED = 0;
+  PLUGIN_TYPE_AGENT_FRAMEWORK = 1;
+  PLUGIN_TYPE_PROTOCOL_ADAPTER = 2;
+  PLUGIN_TYPE_MESSAGE_PROCESSOR = 3;
+  PLUGIN_TYPE_STORAGE_BACKEND = 4;
+  PLUGIN_TYPE_MONITORING = 5;
+  PLUGIN_TYPE_CUSTOM = 6;
+}
+
+// 插件状态
+enum PluginStatus {
+  PLUGIN_STATUS_UNSPECIFIED = 0;
+  PLUGIN_STATUS_INITIALIZING = 1;
+  PLUGIN_STATUS_ACTIVE = 2;
+  PLUGIN_STATUS_INACTIVE = 3;
+  PLUGIN_STATUS_ERROR = 4;
+  PLUGIN_STATUS_SHUTTING_DOWN = 5;
+}
+
+// 注册插件请求
+message RegisterPluginRequest {
+  PluginInfo plugin_info = 1;
+  string endpoint = 2;
+  google.protobuf.Struct config = 3;
+}
+
+// 注册插件响应
+message RegisterPluginResponse {
+  bool success = 1;
+  string plugin_id = 2;
+  optional string error_message = 3;
+}
+
+// 注销插件请求
+message UnregisterPluginRequest {
+  string plugin_id = 1;
+  optional string reason = 2;
+}
+
+// 注销插件响应
+message UnregisterPluginResponse {
+  bool success = 1;
+  optional string message = 2;
+}
+
+// 获取插件信息请求
+message GetPluginInfoRequest {
+  string plugin_id = 1;
+}
+
+// 获取插件信息响应
+message GetPluginInfoResponse {
+  PluginInfo plugin_info = 1;
+}
+
+// 列出插件请求
+message ListPluginsRequest {
+  optional PluginType type_filter = 1;
+  optional PluginStatus status_filter = 2;
+  optional string capability_filter = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+
+// 列出插件响应
+message ListPluginsResponse {
+  repeated PluginInfo plugins = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+// 健康检查请求
+message HealthCheckRequest {
+  string plugin_id = 1;
+}
+
+// 健康检查响应
+message HealthCheckResponse {
+  HealthStatus status = 1;
+  optional string message = 2;
+  google.protobuf.Struct details = 3;
+}
+
+// 健康状态
+enum HealthStatus {
+  HEALTH_STATUS_UNSPECIFIED = 0;
+  HEALTH_STATUS_HEALTHY = 1;
+  HEALTH_STATUS_UNHEALTHY = 2;
+  HEALTH_STATUS_DEGRADED = 3;
+}
+
+// 更新配置请求
+message UpdateConfigRequest {
+  string plugin_id = 1;
+  google.protobuf.Struct config = 2;
+}
+
+// 更新配置响应
+message UpdateConfigResponse {
+  bool success = 1;
+  optional string error_message = 2;
+}
+
+// 处理消息请求
+message ProcessMessageRequest {
+  string plugin_id = 1;
+  agentx.a2a.v1.A2AMessage message = 2;
+  google.protobuf.Struct context = 3;
+}
+
+// 处理消息响应
+message ProcessMessageResponse {
+  bool success = 1;
+  optional agentx.a2a.v1.A2AMessage response_message = 2;
+  optional string error_message = 3;
+  google.protobuf.Struct metadata = 4;
+}

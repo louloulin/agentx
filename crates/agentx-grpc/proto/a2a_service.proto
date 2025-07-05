@@ -1,0 +1,199 @@
+syntax = "proto3";
+
+package agentx.a2a.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+// A2A协议gRPC服务定义
+service A2AService {
+  // 发送A2A消息
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  
+  // 接收A2A消息流
+  rpc ReceiveMessages(ReceiveMessagesRequest) returns (stream A2AMessage);
+  
+  // 提交任务
+  rpc SubmitTask(SubmitTaskRequest) returns (SubmitTaskResponse);
+  
+  // 获取任务状态
+  rpc GetTaskStatus(GetTaskStatusRequest) returns (GetTaskStatusResponse);
+  
+  // 取消任务
+  rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
+  
+  // 双向消息流
+  rpc MessageStream(stream A2AMessage) returns (stream A2AMessage);
+}
+
+// A2A消息定义
+message A2AMessage {
+  string message_id = 1;
+  string conversation_id = 2;
+  MessageRole role = 3;
+  repeated MessagePart parts = 4;
+  google.protobuf.Struct metadata = 5;
+  google.protobuf.Timestamp timestamp = 6;
+}
+
+// 消息角色
+enum MessageRole {
+  MESSAGE_ROLE_UNSPECIFIED = 0;
+  MESSAGE_ROLE_USER = 1;
+  MESSAGE_ROLE_AGENT = 2;
+  MESSAGE_ROLE_SYSTEM = 3;
+}
+
+// 消息部分
+message MessagePart {
+  oneof content {
+    TextPart text = 1;
+    FilePart file = 2;
+    DataPart data = 3;
+    ToolCallPart tool_call = 4;
+  }
+}
+
+// 文本部分
+message TextPart {
+  string text = 1;
+  google.protobuf.Struct metadata = 2;
+}
+
+// 文件部分
+message FilePart {
+  FileData file = 1;
+  google.protobuf.Struct metadata = 2;
+}
+
+// 文件数据
+message FileData {
+  oneof data {
+    FileWithBytes with_bytes = 1;
+    FileWithUri with_uri = 2;
+  }
+}
+
+// 带字节的文件
+message FileWithBytes {
+  optional string name = 1;
+  string mime_type = 2;
+  string bytes = 3; // base64编码
+}
+
+// 带URI的文件
+message FileWithUri {
+  optional string name = 1;
+  string mime_type = 2;
+  string uri = 3;
+}
+
+// 数据部分
+message DataPart {
+  google.protobuf.Struct data = 1;
+  google.protobuf.Struct metadata = 2;
+}
+
+// 工具调用部分
+message ToolCallPart {
+  string tool_call_id = 1;
+  string function_name = 2;
+  google.protobuf.Struct arguments = 3;
+  google.protobuf.Struct metadata = 4;
+}
+
+// 发送消息请求
+message SendMessageRequest {
+  A2AMessage message = 1;
+  string target_agent_id = 2;
+  optional string routing_hint = 3;
+}
+
+// 发送消息响应
+message SendMessageResponse {
+  string message_id = 1;
+  MessageStatus status = 2;
+  optional string error_message = 3;
+}
+
+// 消息状态
+enum MessageStatus {
+  MESSAGE_STATUS_UNSPECIFIED = 0;
+  MESSAGE_STATUS_SENT = 1;
+  MESSAGE_STATUS_DELIVERED = 2;
+  MESSAGE_STATUS_FAILED = 3;
+  MESSAGE_STATUS_PROCESSING = 4;
+}
+
+// 接收消息请求
+message ReceiveMessagesRequest {
+  string agent_id = 1;
+  optional string conversation_id = 2;
+  optional google.protobuf.Timestamp since = 3;
+}
+
+// 任务定义
+message A2ATask {
+  string id = 1;
+  string kind = 2;
+  optional string context_id = 3;
+  TaskStatus status = 4;
+  repeated A2AMessage history = 5;
+  google.protobuf.Struct metadata = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+// 任务状态
+message TaskStatus {
+  TaskState state = 1;
+  optional string message = 2;
+  optional double progress = 3;
+  optional google.protobuf.Timestamp estimated_completion = 4;
+}
+
+// 任务状态枚举
+enum TaskState {
+  TASK_STATE_UNSPECIFIED = 0;
+  TASK_STATE_SUBMITTED = 1;
+  TASK_STATE_IN_PROGRESS = 2;
+  TASK_STATE_COMPLETED = 3;
+  TASK_STATE_FAILED = 4;
+  TASK_STATE_CANCELLED = 5;
+  TASK_STATE_INPUT_REQUIRED = 6;
+}
+
+// 提交任务请求
+message SubmitTaskRequest {
+  string kind = 1;
+  optional string context_id = 2;
+  optional A2AMessage initial_message = 3;
+  google.protobuf.Struct metadata = 4;
+}
+
+// 提交任务响应
+message SubmitTaskResponse {
+  A2ATask task = 1;
+}
+
+// 获取任务状态请求
+message GetTaskStatusRequest {
+  string task_id = 1;
+}
+
+// 获取任务状态响应
+message GetTaskStatusResponse {
+  A2ATask task = 1;
+}
+
+// 取消任务请求
+message CancelTaskRequest {
+  string task_id = 1;
+  optional string reason = 2;
+}
+
+// 取消任务响应
+message CancelTaskResponse {
+  bool success = 1;
+  optional string message = 2;
+}
