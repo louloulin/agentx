@@ -1,0 +1,79 @@
+[package]
+name = "agentx-cluster"
+version = "0.1.0"
+edition = "2021"
+description = "AgentX分布式集群管理模块"
+authors = ["AgentX Team <team@agentx.dev>"]
+license = "Apache-2.0"
+repository = "https://github.com/agentx/agentx"
+
+[dependencies]
+# 核心依赖
+agentx-a2a = { path = "../agentx-a2a" }
+agentx-sdk = { path = "../agentx-sdk" }
+
+# 异步运行时
+tokio = { version = "1.0", features = ["full"] }
+tokio-stream = "0.1"
+
+# 网络和RPC
+tonic = "0.10"
+prost = "0.12"
+
+# 序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 服务发现（暂时注释掉以避免编译问题）
+# consul = "0.4"
+# etcd-rs = "1.0"
+
+# 负载均衡
+# tower = "0.4"
+# tower-load-shed = "0.3"
+
+# 分布式一致性（暂时注释掉以避免编译问题）
+# raft = "0.7"
+# sled = "0.34"
+
+# 时间和UUID
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# 日志和错误处理
+tracing = "0.1"
+tracing-subscriber = "0.3"
+anyhow = "1.0"
+thiserror = "1.0"
+
+# 配置管理
+config = "0.13"
+toml = "0.8"
+
+# 网络工具
+reqwest = { version = "0.11", features = ["json"] }
+url = "2.0"
+
+# 并发工具
+dashmap = "5.0"
+parking_lot = "0.12"
+
+# 异步trait
+async-trait = "0.1"
+
+# 随机数生成
+rand = "0.8"
+
+[dev-dependencies]
+tempfile = "3.0"
+wiremock = "0.5"
+
+[build-dependencies]
+tonic-build = "0.10"
+
+[features]
+default = ["consul", "etcd", "raft"]
+consul = []
+etcd = []
+raft = []
+kubernetes = []
