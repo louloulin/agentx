@@ -11,7 +11,9 @@ pub mod protocol_engine;
 pub mod error;
 pub mod streaming;
 pub mod security;
+pub mod encryption;
 pub mod monitoring;
+pub mod monitoring_dashboard;
 // pub mod client;
 // pub mod server;
 // pub mod actors;
@@ -22,8 +24,11 @@ pub use capability::*;
 pub use protocol_engine::*;
 pub use error::*;
 pub use streaming::*;
-pub use security::*;
+// 选择性导出以避免冲突
+pub use security::{AuthType, SecurityManager, SecurityContext, SecurityConfig, AuthCredentials, SignatureAlgorithm};
+pub use encryption::*;
 pub use monitoring::*;
+pub use monitoring_dashboard::*;
 
 /// A2A Protocol version
 pub const A2A_VERSION: &str = "1.0";

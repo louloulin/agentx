@@ -7,6 +7,7 @@ pub mod service_discovery;
 pub mod load_balancer;
 pub mod cluster_state;
 pub mod health_checker;
+pub mod autoscaler;
 pub mod config;
 pub mod error;
 
@@ -16,8 +17,12 @@ pub use service_discovery::{ServiceDiscovery, ServiceRegistry, DiscoveryBackend}
 pub use load_balancer::{LoadBalancer, LoadBalancingStrategy, TargetNode};
 pub use cluster_state::{ClusterState, ClusterStateManager, StateSync};
 pub use health_checker::{HealthChecker, HealthStatus};
-pub use config::{ClusterConfig, NodeConfig, DiscoveryConfig, LoadBalancerConfig, StateConfig, HealthCheckConfig};
+pub use autoscaler::{AutoScaler, ScalingAction, ScalingDecision, PerformanceMetrics};
+pub use config::{ClusterConfig, NodeConfig, DiscoveryConfig, LoadBalancerConfig, StateConfig, HealthCheckConfig, AutoscalerConfig, ScalingStrategy};
 pub use error::{ClusterError, ClusterResult};
+
+use agentx_a2a::AgentCard;
+use tracing::{info, debug};
 
 /// 集群管理器 - 统一的分布式集群管理接口
 pub struct ClusterManager {
@@ -31,6 +36,8 @@ pub struct ClusterManager {
     state_manager: ClusterStateManager,
     /// 健康检查器
     health_checker: HealthChecker,
+    /// 自动扩缩容管理器
+    autoscaler: AutoScaler,
     /// 配置
     config: ClusterConfig,
 }
@@ -43,13 +50,15 @@ impl ClusterManager {
         let load_balancer = LoadBalancer::new(config.load_balancer.clone()).await?;
         let state_manager = ClusterStateManager::new(config.state.clone()).await?;
         let health_checker = HealthChecker::new(config.health_check.clone()).await?;
-        
+        let autoscaler = AutoScaler::new(config.autoscaler.clone());
+
         Ok(Self {
             node_manager,
             service_discovery,
             load_balancer,
             state_manager,
             health_checker,
+            autoscaler,
             config,
         })
     }
@@ -170,6 +179,60 @@ impl ClusterManager {
     /// 获取负载均衡器目标列表（用于调试）
     pub async fn list_load_balancer_targets(&self) -> ClusterResult<Vec<load_balancer::TargetNode>> {
         self.load_balancer.list_targets().await
+    }
+
+    /// 启动自动扩缩容
+    pub async fn start_autoscaler(&self) -> ClusterResult<()> {
+        if self.config.autoscaler.enabled {
+            self.autoscaler.start().await?;
+            info!("🚀 自动扩缩容已启动");
+        } else {
+            info!("⚠️ 自动扩缩容已禁用");
+        }
+        Ok(())
+    }
+
+    /// 停止自动扩缩容
+    pub async fn stop_autoscaler(&self) -> ClusterResult<()> {
+        self.autoscaler.stop().await?;
+        info!("🛑 自动扩缩容已停止");
+        Ok(())
+    }
+
+    /// 更新自动扩缩容指标
+    pub async fn update_autoscaler_metrics(&self) -> ClusterResult<()> {
+        let cluster_state = self.state_manager.get_state().await?;
+        self.autoscaler.update_metrics_from_cluster_state(&cluster_state).await?;
+        Ok(())
+    }
+
+    /// 获取扩缩容历史
+    pub async fn get_scaling_history(&self) -> Vec<autoscaler::ScalingHistory> {
+        self.autoscaler.get_scaling_history().await
+    }
+
+    /// 获取当前性能指标
+    pub async fn get_performance_metrics(&self) -> PerformanceMetrics {
+        self.autoscaler.get_current_metrics().await
+    }
+
+    /// 手动触发扩缩容决策
+    pub async fn trigger_scaling_decision(&self) -> ClusterResult<autoscaler::ScalingDecision> {
+        let cluster_state = self.state_manager.get_state().await?;
+        let current_instances = cluster_state.agent_count as u32;
+
+        // 更新指标
+        self.autoscaler.update_metrics_from_cluster_state(&cluster_state).await?;
+
+        // 做出决策
+        let decision = self.autoscaler.make_scaling_decision(current_instances).await?;
+
+        // 执行决策
+        if self.config.autoscaler.enabled {
+            self.autoscaler.execute_scaling_action(&decision).await?;
+        }
+
+        Ok(decision)
     }
 }
 

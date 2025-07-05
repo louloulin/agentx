@@ -23,6 +23,8 @@ pub struct ClusterConfig {
     pub state: StateConfig,
     /// 健康检查配置
     pub health_check: HealthCheckConfig,
+    /// 自动扩缩容配置
+    pub autoscaler: AutoscalerConfig,
 }
 
 impl Default for ClusterConfig {
@@ -33,6 +35,7 @@ impl Default for ClusterConfig {
             load_balancer: LoadBalancerConfig::default(),
             state: StateConfig::default(),
             health_check: HealthCheckConfig::default(),
+            autoscaler: AutoscalerConfig::default(),
         }
     }
 }
@@ -423,5 +426,79 @@ mod tests {
         assert!(info.contains_key("lb_strategy"));
         assert!(info.contains_key("cluster_id"));
         assert!(info.contains_key("cluster_name"));
+    }
+}
+
+/// 自动扩缩容策略
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ScalingStrategy {
+    /// 基于CPU使用率
+    CpuBased,
+    /// 基于内存使用率
+    MemoryBased,
+    /// 基于消息队列长度
+    QueueBased,
+    /// 基于响应时间
+    ResponseTimeBased,
+    /// 基于自定义指标
+    CustomMetrics,
+    /// 混合策略
+    Hybrid,
+}
+
+impl Default for ScalingStrategy {
+    fn default() -> Self {
+        Self::Hybrid
+    }
+}
+
+/// 自动扩缩容配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoscalerConfig {
+    /// 是否启用自动扩缩容
+    pub enabled: bool,
+    /// 扩缩容策略
+    pub strategy: ScalingStrategy,
+    /// 最小实例数
+    pub min_instances: u32,
+    /// 最大实例数
+    pub max_instances: u32,
+    /// 扩容阈值 (0.0-1.0)
+    pub scale_up_threshold: f64,
+    /// 缩容阈值 (0.0-1.0)
+    pub scale_down_threshold: f64,
+    /// 扩容步长
+    pub scale_up_step: u32,
+    /// 缩容步长
+    pub scale_down_step: u32,
+    /// 冷却时间
+    pub cooldown_period: Duration,
+    /// 最小置信度
+    pub min_confidence: f64,
+    /// 指标收集间隔
+    pub metrics_collection_interval: Duration,
+    /// 决策间隔
+    pub decision_interval: Duration,
+    /// 最大历史记录数
+    pub max_history_entries: usize,
+}
+
+impl Default for AutoscalerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            strategy: ScalingStrategy::Hybrid,
+            min_instances: 1,
+            max_instances: 10,
+            scale_up_threshold: 0.7,
+            scale_down_threshold: 0.3,
+            scale_up_step: 1,
+            scale_down_step: 1,
+            cooldown_period: Duration::from_secs(300), // 5分钟
+            min_confidence: 0.7,
+            metrics_collection_interval: Duration::from_secs(30),
+            decision_interval: Duration::from_secs(60),
+            max_history_entries: 100,
+        }
     }
 }

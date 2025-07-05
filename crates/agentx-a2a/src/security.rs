@@ -3,6 +3,7 @@
 //! 实现A2A协议的安全认证、授权和加密功能
 
 use crate::{A2AError, A2AResult, TrustLevel};
+use crate::encryption::EncryptionAlgorithm;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use chrono::{DateTime, Utc, Duration};
@@ -27,20 +28,7 @@ pub enum AuthType {
     Custom(String),
 }
 
-/// 加密算法
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum EncryptionAlgorithm {
-    /// 无加密
-    None,
-    /// AES-256-GCM
-    AES256GCM,
-    /// ChaCha20-Poly1305
-    ChaCha20Poly1305,
-    /// RSA-OAEP
-    RSAOAEP,
-    /// ECDH-ES
-    ECDH,
-}
+// EncryptionAlgorithm 现在从 encryption 模块导入
 
 /// 签名算法
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

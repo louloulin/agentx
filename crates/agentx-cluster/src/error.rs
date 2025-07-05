@@ -70,7 +70,11 @@ pub enum ClusterError {
     /// 资源不足错误
     #[error("资源不足错误: {0}")]
     ResourceExhaustedError(String),
-    
+
+    /// 已在运行错误
+    #[error("已在运行: {0}")]
+    AlreadyRunning(String),
+
     /// 内部错误
     #[error("内部错误: {0}")]
     InternalError(String),
