@@ -9,6 +9,9 @@ pub mod agent_card;
 pub mod capability;
 pub mod protocol_engine;
 pub mod error;
+pub mod streaming;
+pub mod security;
+pub mod monitoring;
 // pub mod client;
 // pub mod server;
 // pub mod actors;
@@ -18,6 +21,9 @@ pub use agent_card::*;
 pub use capability::*;
 pub use protocol_engine::*;
 pub use error::*;
+pub use streaming::*;
+pub use security::*;
+pub use monitoring::*;
 
 /// A2A Protocol version
 pub const A2A_VERSION: &str = "1.0";

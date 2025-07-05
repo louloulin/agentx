@@ -236,7 +236,7 @@ pub struct UxCapabilities {
 }
 
 /// Trust level for enterprise environments
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum TrustLevel {
@@ -264,7 +264,7 @@ impl TrustLevel {
 }
 
 /// Agent status
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum AgentStatus {
