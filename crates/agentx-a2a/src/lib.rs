@@ -18,6 +18,7 @@ pub use message::*;
 pub use agent_card::*;
 pub use capability::*;
 pub use protocol::*;
+pub use protocol_engine::*;
 pub use error::*;
 pub use client::*;
 pub use server::*;

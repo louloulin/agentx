@@ -5,9 +5,9 @@
 
 use actix::prelude::*;
 use crate::{
-    A2AMessage, A2AError, A2AResult, MessageType, MessagePayload, 
-    ErrorPayload, ProtocolConfig
+    A2AMessage, A2AError, A2AResult, MessageRole, ProtocolConfig
 };
+use crate::protocol_engine::A2AProtocolEngine;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -16,15 +16,12 @@ use uuid::Uuid;
 
 /// A2A Protocol Engine Actor
 pub struct A2AProtocolActor {
-    /// Protocol configuration
-    config: ProtocolConfig,
-    
+    /// A2A protocol engine
+    engine: A2AProtocolEngine,
+
     /// Message processing statistics
     stats: ProtocolStats,
-    
-    /// Active message handlers
-    handlers: HashMap<MessageType, Addr<MessageHandlerActor>>,
-    
+
     /// Message processing pool
     handler_pool: Vec<Addr<MessageHandlerActor>>,
 }
@@ -60,7 +57,7 @@ pub struct ProcessingContext {
 #[derive(Message, Debug)]
 #[rtype(result = "A2AResult<()>")]
 pub struct RegisterHandler {
-    pub message_type: MessageType,
+    pub handler_name: String,
     pub handler: Addr<MessageHandlerActor>,
 }
 
