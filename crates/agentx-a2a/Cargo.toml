@@ -54,3 +54,7 @@ utoipa = ["dep:utoipa"]
 [dev-dependencies]
 tokio-test = "0.4"
 mockall.workspace = true
+
+[[example]]
+name = "a2a_enhanced_demo"
+path = "../../examples/a2a_enhanced_demo.rs"
