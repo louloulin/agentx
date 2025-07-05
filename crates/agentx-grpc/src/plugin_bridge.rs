@@ -3,13 +3,14 @@
 //! 实现gRPC插件系统与A2A协议的桥接，支持不同框架的Agent通过gRPC插件接入
 
 use crate::proto::{
-    agent_x_plugin_client::AgentXPluginClient, agent_x_plugin_server::AgentXPlugin,
+    agent_x_plugin_client::AgentXPluginClient,
     A2aMessageRequest, A2aStreamChunk, InitializeRequest,
 };
 use agentx_a2a::{
     A2AMessage, A2AProtocolEngine, StreamManager, StreamChunk, StreamType,
-    SecurityManager, MonitoringManager, A2AResult, A2AError,
+    SecurityManager, A2AResult, A2AError,
 };
+use agentx_a2a::monitoring::MonitoringManager;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{RwLock, mpsc};

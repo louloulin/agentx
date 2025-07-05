@@ -41,6 +41,9 @@ impl AppState {
             task_timeout_seconds: config.a2a.task_timeout_seconds,
             enable_message_validation: config.a2a.enable_message_validation,
             enable_task_persistence: config.a2a.enable_task_persistence,
+            handler_pool_size: Some(10),
+            validate_messages: config.a2a.enable_message_validation,
+            max_message_size: 1024 * 1024, // 1MB
         };
         
         let engine = A2AProtocolEngine::new(engine_config);

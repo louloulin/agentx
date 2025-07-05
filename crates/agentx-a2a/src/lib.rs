@@ -29,8 +29,15 @@ pub use streaming::*;
 // 选择性导出以避免冲突
 pub use security::{AuthType, SecurityManager, SecurityContext, SecurityConfig, AuthCredentials, SignatureAlgorithm};
 pub use encryption::*;
-pub use monitoring::*;
-pub use monitoring_dashboard::*;
+// 选择性导出监控模块以避免冲突
+pub use monitoring::{
+    MetricType as MonitoringMetricType, MetricPoint, PerformanceStats,
+    MessageStats, AgentStats, SystemStats, MonitoringConfig
+};
+pub use monitoring_dashboard::{
+    MonitoringDashboard, DashboardConfig, AlertRule, AlertSeverity, Alert,
+    PerformanceMetrics as DashboardPerformanceMetrics, Widget, WidgetType
+};
 pub use actors::*;
 
 /// A2A Protocol version

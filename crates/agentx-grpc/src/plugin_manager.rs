@@ -283,7 +283,7 @@ impl PluginManager {
     
     // 私有方法
     
-    async fn select_plugin_for_agent(&self, agent_id: &str) -> A2AResult<String> {
+    async fn select_plugin_for_agent(&self, _agent_id: &str) -> A2AResult<String> {
         // 简化实现：返回第一个可用插件
         let plugins = self.bridge.get_all_plugins().await;
         

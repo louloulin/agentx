@@ -207,7 +207,7 @@ impl AgentXPlugin for AgentXGrpcServer {
         println!("📨 处理A2A消息: {} -> {}", req.from_agent, req.to_agent);
         
         // 转换为内部A2A消息格式
-        let a2a_message = A2AMessage::new_text(
+        let _a2a_message = A2AMessage::new_text(
             MessageRole::Agent,
             format!("Message from {}: {}", req.from_agent, req.message_id)
         );

@@ -26,8 +26,7 @@ pub use registry_actor::{
 
 // Router Actor exports
 pub use router_actor::{
-    MessageRouterActor, RouteMessage, AddRoute, RemoveRoute,
-    GetRouterStats, RouterStats, RouteResult
+    MessageRouterActor, RouteMessage, GetRouterStats, RouterStats, RouteResult
 };
 
 // Supervisor Actor exports
@@ -40,16 +39,17 @@ pub use supervisor_actor::{
 
 // Security Actor exports
 pub use security_actor::{
-    SecurityManagerActor, AuthenticateUser, AuthorizeAction, CreateSession,
-    RevokeSession, GetSecurityStats, SecurityStats, UserSession,
-    SecurityPolicy, AuthenticationResult, AuthorizationResult
+    SecurityManagerActor, Authenticate, Authorize, InvalidateSession,
+    GetAuditEvents, SecurityPolicy, AuthenticationResult, AuthorizationResult,
+    Credentials, AuditEvent, AuditFilter
 };
 
 // Metrics Actor exports
 pub use metrics_actor::{
-    MetricsActor, RecordMetric, GetMetrics, GetMetricsStats,
-    MetricsStats, MetricType as ActorMetricType,
-    PerformanceMetrics as ActorPerformanceMetrics
+    MetricsCollectorActor, RecordMetric, GetAllMetrics, GetSystemMetrics,
+    GetPerformanceMetrics, GetCustomMetrics, ResetMetrics, CollectMetrics,
+    SystemMetrics, PerformanceMetrics as ActorPerformanceMetrics,
+    MetricValue, MetricType as ActorMetricType, AllMetrics, MetricsConfig
 };
 
 use actix::prelude::*;

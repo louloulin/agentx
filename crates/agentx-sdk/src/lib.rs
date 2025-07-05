@@ -21,7 +21,7 @@ pub use agentx_a2a::{
     A2AMessage, MessageRole, A2AError, A2AResult,
     StreamManager, StreamType, StreamChunk,
     SecurityManager, SecurityConfig, AuthCredentials, AuthType, TrustLevel,
-    MonitoringManager, MonitoringConfig,
+    MonitoringConfig,
 };
 
 pub use agentx_grpc::{
