@@ -91,6 +91,10 @@ chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.11", features = ["json"] }
 base64 = "0.21"
 
+[dev-dependencies]
+tokio-test = "0.4"
+criterion = { version = "0.5", features = ["html_reports"] }
+
 [[example]]
 name = "agentx_ecosystem_demo"
 path = "examples/agentx_ecosystem_demo.rs"
