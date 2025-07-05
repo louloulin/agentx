@@ -5,7 +5,7 @@
 use thiserror::Error;
 
 /// 路由器错误类型
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug)]
 pub enum RouterError {
     /// 没有可用的Agent
     #[error("没有可用的Agent: {0}")]

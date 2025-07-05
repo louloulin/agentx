@@ -12,10 +12,14 @@ use async_trait::async_trait;
 /// 插件状态枚举
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PluginStatus {
+    /// 已注册
+    Registered,
     /// 未初始化
     Uninitialized,
     /// 初始化中
     Initializing,
+    /// 启动中
+    Starting,
     /// 运行中
     Running,
     /// 暂停
@@ -24,6 +28,8 @@ pub enum PluginStatus {
     Stopping,
     /// 已停止
     Stopped,
+    /// 失败状态
+    Failed,
     /// 错误状态
     Error(String),
 }

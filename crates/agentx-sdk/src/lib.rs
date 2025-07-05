@@ -10,6 +10,9 @@ pub mod builder;
 pub mod client;
 pub mod server;
 pub mod utils;
+pub mod lifecycle;
+pub mod security;
+pub mod config_manager;
 
 // 重新导出核心类型
 pub use agentx_a2a::{
@@ -27,6 +30,24 @@ pub use agentx_grpc::{
 pub use plugin::{
     Plugin, PluginInfo, PluginStatus, PluginConfig, PluginMetadata,
     PluginCapability, PluginEvent, PluginLifecycle,
+};
+
+// 生命周期管理
+pub use lifecycle::{
+    PluginLifecycleManager, PluginState, HealthStatus, LifecycleConfig,
+};
+
+// 安全管理
+pub use security::{
+    PluginSecurityManager, PermissionPolicy, ResourceLimits, AccessControlList,
+    Operation, Resource, SecurityConfig as PluginSecurityConfig, SecurityResult, SecurityAuditEntry,
+    create_default_permission_policy,
+};
+
+// 配置管理
+pub use config_manager::{
+    PluginConfigManager, PluginConfigEntry, ConfigValidator, ConfigManagerConfig,
+    ConfigFormat, ValidationRule,
 };
 
 pub use framework::{

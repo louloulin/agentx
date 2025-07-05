@@ -3,7 +3,8 @@
 //! 提供多种路由策略，包括轮询、最少连接、加权轮询等
 
 use crate::{AgentInfo, RouterError};
-use agentx_a2a::{A2AMessage, AgentEndpoint};
+use agentx_a2a::A2AMessage;
+use crate::AgentEndpoint;
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
