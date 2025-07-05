@@ -4,10 +4,21 @@
 
 pub mod error;
 pub mod converter;
+pub mod plugin_bridge;
+pub mod plugin_manager;
+pub mod grpc_server;
+
+// 生成的protobuf代码
+pub mod proto {
+    tonic::include_proto!("agentx.plugin.v1");
+}
 
 // 重新导出主要类型
 pub use error::*;
 pub use converter::*;
+pub use plugin_bridge::*;
+pub use plugin_manager::*;
+pub use grpc_server::*;
 
 /// gRPC插件系统版本
 pub const GRPC_VERSION: &str = "0.1.0";

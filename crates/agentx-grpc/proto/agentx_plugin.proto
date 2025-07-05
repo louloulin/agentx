@@ -1,0 +1,251 @@
+syntax = "proto3";
+
+package agentx.plugin.v1;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// gRPC插件服务定义
+service AgentXPlugin {
+  // 插件生命周期管理
+  rpc Initialize(InitializeRequest) returns (InitializeResponse);
+  rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse);
+  
+  // A2A消息处理
+  rpc ProcessA2AMessage(A2AMessageRequest) returns (A2AMessageResponse);
+  rpc ProcessA2AStream(stream A2AStreamChunk) returns (stream A2AStreamChunk);
+  
+  // Agent管理
+  rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);
+  rpc UnregisterAgent(UnregisterAgentRequest) returns (google.protobuf.Empty);
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+  rpc GetAgentCapabilities(GetAgentCapabilitiesRequest) returns (GetAgentCapabilitiesResponse);
+  
+  // 插件信息
+  rpc GetPluginInfo(google.protobuf.Empty) returns (PluginInfoResponse);
+  rpc GetMetrics(google.protobuf.Empty) returns (MetricsResponse);
+}
+
+// 插件初始化
+message InitializeRequest {
+  string plugin_id = 1;
+  map<string, string> config = 2;
+  string agentx_version = 3;
+  repeated string supported_protocols = 4;
+}
+
+message InitializeResponse {
+  bool success = 1;
+  string error_message = 2;
+  PluginInfo plugin_info = 3;
+  repeated string supported_features = 4;
+}
+
+// 健康检查
+message HealthCheckResponse {
+  enum Status {
+    UNKNOWN = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
+    SERVICE_UNKNOWN = 3;
+  }
+  Status status = 1;
+  string message = 2;
+  map<string, string> details = 3;
+}
+
+// A2A消息处理
+message A2AMessageRequest {
+  string message_id = 1;
+  string from_agent = 2;
+  string to_agent = 3;
+  MessageType message_type = 4;
+  google.protobuf.Any payload = 5;
+  map<string, string> metadata = 6;
+  google.protobuf.Timestamp timestamp = 7;
+  int32 ttl_seconds = 8;
+}
+
+message A2AMessageResponse {
+  bool success = 1;
+  string error_message = 2;
+  A2AMessageRequest response_message = 3;
+  ProcessingStats stats = 4;
+}
+
+// 流式消息处理
+message A2AStreamChunk {
+  string stream_id = 1;
+  uint64 sequence = 2;
+  bytes data = 3;
+  bool is_final = 4;
+  string checksum = 5;
+  StreamType stream_type = 6;
+  map<string, string> metadata = 7;
+}
+
+// Agent注册
+message RegisterAgentRequest {
+  AgentInfo agent_info = 1;
+  repeated Capability capabilities = 2;
+  map<string, string> config = 3;
+}
+
+message RegisterAgentResponse {
+  bool success = 1;
+  string error_message = 2;
+  string agent_id = 3;
+  string registration_token = 4;
+}
+
+message UnregisterAgentRequest {
+  string agent_id = 1;
+  string registration_token = 2;
+}
+
+// Agent列表
+message ListAgentsRequest {
+  string filter = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListAgentsResponse {
+  repeated AgentInfo agents = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+// Agent能力查询
+message GetAgentCapabilitiesRequest {
+  string agent_id = 1;
+}
+
+message GetAgentCapabilitiesResponse {
+  repeated Capability capabilities = 1;
+  map<string, string> metadata = 2;
+}
+
+// 插件信息
+message PluginInfoResponse {
+  PluginInfo plugin_info = 1;
+  repeated string supported_frameworks = 2;
+  map<string, string> runtime_info = 3;
+}
+
+// 指标信息
+message MetricsResponse {
+  repeated Metric metrics = 1;
+  google.protobuf.Timestamp collected_at = 2;
+}
+
+// 数据结构定义
+message PluginInfo {
+  string name = 1;
+  string version = 2;
+  string description = 3;
+  string author = 4;
+  repeated string supported_frameworks = 5;
+  map<string, string> metadata = 6;
+}
+
+message AgentInfo {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string framework = 4;
+  string version = 5;
+  AgentStatus status = 6;
+  TrustLevel trust_level = 7;
+  repeated string tags = 8;
+  map<string, string> metadata = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+message Capability {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  CapabilityType type = 4;
+  repeated Parameter parameters = 5;
+  repeated Parameter returns = 6;
+  map<string, string> metadata = 7;
+}
+
+message Parameter {
+  string name = 1;
+  string type = 2;
+  string description = 3;
+  bool required = 4;
+  google.protobuf.Any default_value = 5;
+}
+
+message ProcessingStats {
+  google.protobuf.Timestamp start_time = 1;
+  google.protobuf.Timestamp end_time = 2;
+  int64 processing_time_ms = 3;
+  int64 memory_used_bytes = 4;
+  map<string, int64> counters = 5;
+}
+
+message Metric {
+  string name = 1;
+  MetricType type = 2;
+  double value = 3;
+  map<string, string> labels = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+// 枚举定义
+enum MessageType {
+  MESSAGE_TYPE_UNSPECIFIED = 0;
+  MESSAGE_TYPE_REQUEST = 1;
+  MESSAGE_TYPE_RESPONSE = 2;
+  MESSAGE_TYPE_EVENT = 3;
+  MESSAGE_TYPE_STREAM = 4;
+}
+
+enum StreamType {
+  STREAM_TYPE_UNSPECIFIED = 0;
+  STREAM_TYPE_DATA = 1;
+  STREAM_TYPE_FILE = 2;
+  STREAM_TYPE_EVENT = 3;
+  STREAM_TYPE_TASK = 4;
+  STREAM_TYPE_AUDIO = 5;
+  STREAM_TYPE_VIDEO = 6;
+}
+
+enum AgentStatus {
+  AGENT_STATUS_UNSPECIFIED = 0;
+  AGENT_STATUS_ONLINE = 1;
+  AGENT_STATUS_OFFLINE = 2;
+  AGENT_STATUS_BUSY = 3;
+  AGENT_STATUS_ERROR = 4;
+}
+
+enum TrustLevel {
+  TRUST_LEVEL_UNSPECIFIED = 0;
+  TRUST_LEVEL_PUBLIC = 1;
+  TRUST_LEVEL_VERIFIED = 2;
+  TRUST_LEVEL_TRUSTED = 3;
+  TRUST_LEVEL_INTERNAL = 4;
+}
+
+enum CapabilityType {
+  CAPABILITY_TYPE_UNSPECIFIED = 0;
+  CAPABILITY_TYPE_TOOL = 1;
+  CAPABILITY_TYPE_SKILL = 2;
+  CAPABILITY_TYPE_KNOWLEDGE = 3;
+  CAPABILITY_TYPE_WORKFLOW = 4;
+}
+
+enum MetricType {
+  METRIC_TYPE_UNSPECIFIED = 0;
+  METRIC_TYPE_COUNTER = 1;
+  METRIC_TYPE_GAUGE = 2;
+  METRIC_TYPE_HISTOGRAM = 3;
+  METRIC_TYPE_SUMMARY = 4;
+}

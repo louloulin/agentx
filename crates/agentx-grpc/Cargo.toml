@@ -38,6 +38,12 @@ async-trait.workspace = true
 # A2A协议支持
 agentx-a2a = { path = "../agentx-a2a" }
 
+# gRPC反射
+tonic-reflection = "0.10"
+
+# 随机数生成
+rand = "0.8"
+
 [build-dependencies]
 tonic-build = "0.10"
 

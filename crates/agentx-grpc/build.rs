@@ -4,20 +4,18 @@
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=proto/");
-    
-    // 编译A2A协议的protobuf定义
+
+    // 编译新的AgentX插件协议
     tonic_build::configure()
         .build_server(true)
         .build_client(true)
-        .out_dir("src/generated")
+        .file_descriptor_set_path("proto/descriptor.bin")
         .compile(
             &[
-                "proto/a2a_service.proto",
-                "proto/plugin_service.proto",
-                "proto/agent_registry.proto",
+                "proto/agentx_plugin.proto",
             ],
             &["proto"],
         )?;
-    
+
     Ok(())
 }
