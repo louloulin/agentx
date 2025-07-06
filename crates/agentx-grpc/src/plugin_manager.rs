@@ -6,7 +6,7 @@ use crate::plugin_bridge::{PluginBridge, PluginStatus};
 use agentx_a2a::{A2AResult, A2AError, A2AMessage};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::process::{Child, Command, Stdio};
+// use std::process::{Child, Command, Stdio};
 use tokio::sync::{RwLock, mpsc};
 use tokio::time::{interval, Duration, Instant};
 use tokio::process::Command as TokioCommand;
@@ -88,7 +88,9 @@ pub struct QueuedMessage {
 /// 负载均衡器
 #[derive(Debug)]
 pub struct LoadBalancer {
+    #[allow(dead_code)]
     strategy: LoadBalanceStrategy,
+    #[allow(dead_code)]
     plugin_weights: HashMap<String, f64>,
     plugin_requests: HashMap<String, u64>,
 }
@@ -658,6 +660,7 @@ impl LoadBalancer {
         }
     }
     
+    #[allow(dead_code)]
     fn select_plugin(&mut self, available_plugins: &[String]) -> Option<String> {
         if available_plugins.is_empty() {
             return None;

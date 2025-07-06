@@ -2,7 +2,7 @@
 //! 
 //! 提供Agent信息和路由结果的缓存功能，提高路由性能
 
-use crate::{AgentInfo, RouterError, RouterResult};
+use crate::AgentInfo;
 use agentx_a2a::AgentCard;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -16,6 +16,7 @@ struct CacheEntry<T> {
     /// 缓存的值
     value: T,
     /// 创建时间
+    #[allow(dead_code)]
     created_at: Instant,
     /// 过期时间
     expires_at: Instant,
@@ -218,7 +219,7 @@ impl RouteCache {
 
     /// 清理过期缓存
     pub async fn cleanup_expired(&self) {
-        let now = Instant::now();
+        let _now = Instant::now();
         let mut removed_count = 0;
 
         // 清理Agent缓存

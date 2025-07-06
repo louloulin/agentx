@@ -21,8 +21,7 @@ pub use autoscaler::{AutoScaler, ScalingAction, ScalingDecision, PerformanceMetr
 pub use config::{ClusterConfig, NodeConfig, DiscoveryConfig, LoadBalancerConfig, StateConfig, HealthCheckConfig, AutoscalerConfig, ScalingStrategy};
 pub use error::{ClusterError, ClusterResult};
 
-use agentx_a2a::AgentCard;
-use tracing::{info, debug};
+use tracing::info;
 
 /// 集群管理器 - 统一的分布式集群管理接口
 pub struct ClusterManager {

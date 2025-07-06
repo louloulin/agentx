@@ -537,9 +537,9 @@ impl DeveloperEcosystemManager {
     pub async fn generate_plugin_scaffold(&self, 
         name: &str, 
         template: &str, 
-        output_dir: &str
+        _output_dir: &str
     ) -> A2AResult<()> {
-        if let Some(template_def) = self.cli.get_template(template) {
+        if let Some(_template_def) = self.cli.get_template(template) {
             // 创建项目目录
             // 生成文件
             // 设置依赖

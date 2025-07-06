@@ -4,14 +4,14 @@
 
 use crate::plugin::{PluginConfig, PluginMetadata};
 use crate::security::{PermissionPolicy, ResourceLimits, AccessControlList};
-use agentx_a2a::{A2AResult, A2AError, TrustLevel};
+use agentx_a2a::{A2AResult, A2AError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::fs;
-use tracing::{debug, info, warn, error};
+use tracing::{debug, info, warn};
 use chrono::{DateTime, Utc};
 
 /// 插件配置管理器
@@ -52,6 +52,7 @@ pub struct PluginConfigEntry {
 /// 配置验证器
 pub struct ConfigValidator {
     /// 必需字段
+    #[allow(dead_code)]
     required_fields: Vec<String>,
     /// 字段验证规则
     validation_rules: HashMap<String, ValidationRule>,
@@ -418,8 +419,8 @@ impl PluginConfigManager {
     }
 
     async fn start_auto_save_task(&self) {
-        let configs = self.configs.clone();
-        let config_dir = self.config_dir.clone();
+        let _configs = self.configs.clone();
+        let _config_dir = self.config_dir.clone();
         let interval_secs = self.manager_config.auto_save_interval_secs;
 
         tokio::spawn(async move {

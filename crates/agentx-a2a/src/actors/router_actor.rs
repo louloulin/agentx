@@ -131,6 +131,7 @@ impl MessageRouterActor {
     }
     
     /// Update route cache
+    #[allow(dead_code)]
     fn update_cache(&mut self, agent_id: &str, endpoint: &str, success: bool) {
         let route = self.route_cache.entry(agent_id.to_string()).or_insert_with(|| {
             CachedRoute {

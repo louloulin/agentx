@@ -6,7 +6,6 @@
 //! - 网络抖动和丢包情况下的性能测试
 //! - 真实负载下的系统稳定性测试
 
-use crate::performance_analyzer::{BenchmarkResult, BenchmarkStatus, LiveMetrics};
 use agentx_a2a::{A2AResult, A2AError, A2AMessage, MessageRole, AgentCard};
 use agentx_cluster::{ClusterManager, ClusterConfig};
 use agentx_router::{MessageRouter, RouterConfig};
@@ -15,17 +14,16 @@ use std::collections::HashMap;
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
-use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{RwLock, Semaphore};
 use tokio::time::timeout;
-use tracing::{info, warn, error, debug};
-use uuid::Uuid;
+use tracing::{info, debug};
 
 /// 真实网络基准测试管理器
 pub struct RealNetworkBenchmarks {
     /// 测试配置
     config: RealNetworkConfig,
     /// 集群管理器
+    #[allow(dead_code)]
     cluster_manager: Arc<ClusterManager>,
     /// 消息路由器（可选，用于基准测试）
     router: Arc<RwLock<Option<MessageRouter>>>,
@@ -222,7 +220,7 @@ impl RealNetworkBenchmarks {
             .map_err(|e| A2AError::internal(format!("创建集群管理器失败: {}", e)))?);
         
         // 创建消息路由器（简化实现，用于基准测试）
-        let router_config = RouterConfig::default();
+        let _router_config = RouterConfig::default();
         // 注意：在实际实现中，这里需要创建真实的路由器依赖
         // 为了基准测试，我们暂时跳过路由器的创建
         let router = Arc::new(RwLock::new(None::<MessageRouter>));
@@ -409,8 +407,8 @@ impl RealNetworkBenchmarks {
 
         for agent_id in 0..concurrent_agents {
             let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let router = self.router.clone();
-            let nodes = self.test_nodes.clone();
+            let _router = self.router.clone();
+            let _nodes = self.test_nodes.clone();
 
             let handle = tokio::spawn(async move {
                 let _permit = permit;
@@ -1073,6 +1071,7 @@ struct StabilityAnalysis {
     /// 性能退化百分比
     performance_degradation: f64,
     /// 趋势
+    #[allow(dead_code)]
     trend: String,
 }
 

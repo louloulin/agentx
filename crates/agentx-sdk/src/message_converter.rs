@@ -12,6 +12,7 @@ use tracing::{debug, warn};
 /// 消息转换器
 pub struct MessageConverter {
     /// 转换规则缓存
+    #[allow(dead_code)]
     conversion_rules: HashMap<(FrameworkType, FrameworkType), ConversionRule>,
     /// 转换统计
     stats: ConversionStats,

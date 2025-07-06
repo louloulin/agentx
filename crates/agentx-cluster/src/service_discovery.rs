@@ -9,8 +9,7 @@ use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn, error};
-use std::collections::HashMap;
+use tracing::{info, debug};
 
 /// 服务发现后端类型
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -313,10 +312,10 @@ impl ServiceDiscovery {
     
     /// 启动清理任务
     async fn start_cleanup_task(&self) -> ClusterResult<()> {
-        let backend = self.backend.as_ref() as *const dyn ServiceDiscoveryBackend;
+        let _backend = self.backend.as_ref() as *const dyn ServiceDiscoveryBackend;
         let running = self.running.clone();
         let cleanup_interval = self.config.cleanup_interval;
-        let ttl_seconds = self.config.ttl_seconds;
+        let _ttl_seconds = self.config.ttl_seconds;
         
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(cleanup_interval);
@@ -350,10 +349,12 @@ impl ServiceDiscovery {
 /// etcd服务发现后端实现
 pub struct EtcdServiceDiscovery {
     /// etcd客户端配置
+    #[allow(dead_code)]
     endpoints: Vec<String>,
     /// 键前缀
     key_prefix: String,
     /// TTL设置
+    #[allow(dead_code)]
     default_ttl: u64,
     /// 本地缓存
     cache: Arc<DashMap<String, ServiceRegistry>>,
@@ -682,7 +683,7 @@ mod tests {
         use crate::config::DiscoveryConfig;
 
         // 创建etcd后端配置
-        let config = DiscoveryConfig {
+        let _config = DiscoveryConfig {
             backend: DiscoveryBackend::Etcd,
             ttl_seconds: 30,
             cleanup_interval: std::time::Duration::from_secs(60),

@@ -2,12 +2,11 @@
 //! 
 //! 提供完整的插件生命周期管理功能，包括加载、启动、停止、监控等
 
-use crate::plugin::{Plugin, PluginInfo, PluginStatus, PluginConfig, PluginEvent, PluginStats};
+use crate::plugin::{Plugin, PluginStatus, PluginEvent, PluginStats};
 use agentx_a2a::{A2AResult, A2AError, A2AMessage};
-use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::sync::{RwLock, mpsc, Mutex};
 use tokio::time::interval;
 use tracing::{debug, error, info, warn};

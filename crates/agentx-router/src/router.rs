@@ -3,7 +3,7 @@
 //! This module implements intelligent message routing with load balancing,
 //! failover, and performance optimization.
 
-use agentx_a2a::{A2AMessage, AgentCard, A2AError, A2AResult};
+use agentx_a2a::{A2AMessage, AgentCard, A2AResult};
 use crate::{RoutingStrategy, RouterMetrics, RouteCache, RouterError};
 use async_trait::async_trait;
 use std::collections::HashMap;

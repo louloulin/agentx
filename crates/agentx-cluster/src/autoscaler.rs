@@ -2,7 +2,7 @@
 //! 
 //! 基于负载和性能指标自动调整集群规模
 
-use crate::config::{AutoscalerConfig, ScalingStrategy};
+use crate::config::AutoscalerConfig;
 use crate::error::{ClusterError, ClusterResult};
 use crate::cluster_state::ClusterState;
 use serde::{Deserialize, Serialize};
@@ -312,7 +312,7 @@ impl AutoScaler {
     // 私有方法
 
     async fn start_metrics_collection(&self) -> ClusterResult<()> {
-        let current_metrics = self.current_metrics.clone();
+        let _current_metrics = self.current_metrics.clone();
         let running = self.running.clone();
         let collection_interval = self.config.metrics_collection_interval;
 
@@ -493,7 +493,7 @@ impl AutoScaler {
         }
     }
 
-    async fn decide_custom_metrics(&self, metrics: &PerformanceMetrics, current_instances: u32) -> ScalingAction {
+    async fn decide_custom_metrics(&self, _metrics: &PerformanceMetrics, _current_instances: u32) -> ScalingAction {
         // 基于自定义指标的决策
         // TODO: 实现自定义指标逻辑
         ScalingAction::NoAction

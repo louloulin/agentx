@@ -136,6 +136,7 @@ impl PluginServer {
 
 /// 框架服务器
 pub struct FrameworkServer {
+    #[allow(dead_code)]
     plugin_server: PluginServer,
     frameworks: Arc<RwLock<HashMap<String, Framework>>>,
 }

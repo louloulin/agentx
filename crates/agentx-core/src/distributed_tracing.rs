@@ -6,11 +6,11 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn, error};
+use tracing::{info, debug, warn};
 use uuid::Uuid;
-use agentx_a2a::{A2AResult, A2AError};
+use agentx_a2a::A2AResult;
 
 /// 分布式追踪管理器
 pub struct DistributedTracingManager {
@@ -246,6 +246,7 @@ pub struct JaegerExporter {
     /// Jaeger端点
     endpoint: String,
     /// 服务名称
+    #[allow(dead_code)]
     service_name: String,
 }
 
@@ -254,6 +255,7 @@ pub struct OpenTelemetryExporter {
     /// OTLP端点
     endpoint: String,
     /// 认证头
+    #[allow(dead_code)]
     headers: HashMap<String, String>,
 }
 
@@ -843,7 +845,7 @@ impl TraceExporter for OpenTelemetryExporter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    // use std::time::Duration;
 
     fn create_test_tracing_manager() -> DistributedTracingManager {
         let config = TracingConfig {

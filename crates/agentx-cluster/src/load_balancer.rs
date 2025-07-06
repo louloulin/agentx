@@ -324,7 +324,7 @@ impl LoadBalancer {
     
     /// 启动统计更新任务
     async fn start_stats_update_task(&self) -> ClusterResult<()> {
-        let targets = self.targets.clone();
+        let _targets = self.targets.clone();
         let running = self.running.clone();
         let update_interval = self.config.stats_update_interval;
         

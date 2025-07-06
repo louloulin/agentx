@@ -2,10 +2,10 @@
 //! 
 //! 提供插件运行时的安全隔离、权限控制和资源限制功能
 
-use agentx_a2a::{A2AResult, A2AError, A2AMessage, TrustLevel};
+use agentx_a2a::{A2AResult, A2AError, TrustLevel};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 use tokio::sync::RwLock;
 use std::sync::Arc;
 use tracing::{debug, warn, error};
@@ -425,7 +425,7 @@ impl PluginSecurityManager {
 /// 创建默认权限策略
 pub fn create_default_permission_policy(plugin_id: String, trust_level: TrustLevel) -> PermissionPolicy {
     let mut allowed_operations = HashSet::new();
-    let mut accessible_resources = HashSet::new();
+    let accessible_resources = HashSet::new();
 
     // 根据信任级别设置默认权限
     match trust_level {

@@ -16,6 +16,7 @@ use uuid::Uuid;
 /// A2A Protocol Engine Actor
 pub struct A2AProtocolActor {
     /// A2A protocol engine
+    #[allow(dead_code)]
     engine: A2AProtocolEngine,
 
     /// Protocol configuration

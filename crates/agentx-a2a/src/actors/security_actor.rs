@@ -15,6 +15,7 @@ pub struct SecurityManagerActor {
     sessions: HashMap<String, Session>,
     
     /// Security policies
+    #[allow(dead_code)]
     policies: HashMap<String, SecurityPolicy>,
     
     /// Audit log

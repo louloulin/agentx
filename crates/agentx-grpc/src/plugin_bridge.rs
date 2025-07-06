@@ -19,10 +19,13 @@ use tonic::Request;
 /// gRPC插件桥接器
 pub struct PluginBridge {
     /// A2A协议引擎
+    #[allow(dead_code)]
     a2a_engine: Arc<RwLock<A2AProtocolEngine>>,
     /// 流管理器
+    #[allow(dead_code)]
     stream_manager: Arc<RwLock<StreamManager>>,
     /// 安全管理器
+    #[allow(dead_code)]
     security_manager: Arc<RwLock<SecurityManager>>,
     /// 监控管理器
     monitoring_manager: Arc<RwLock<MonitoringManager>>,

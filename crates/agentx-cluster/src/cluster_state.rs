@@ -134,7 +134,7 @@ impl StateSync for MemoryStateSync {
     }
     
     async fn watch_state_changes(&self) -> ClusterResult<tokio::sync::mpsc::Receiver<ClusterState>> {
-        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        let (_tx, rx) = tokio::sync::mpsc::channel(100);
         
         // TODO: 实现状态变化监听
         // 这里只是一个占位实现
@@ -341,7 +341,7 @@ impl ClusterStateManager {
     
     /// 启动状态同步任务
     async fn start_sync_task(&self) -> ClusterResult<()> {
-        let cluster_state = self.cluster_state.clone();
+        let _cluster_state = self.cluster_state.clone();
         let running = self.running.clone();
         let sync_interval = self.config.sync_interval;
         
