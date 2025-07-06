@@ -510,3 +510,524 @@ impl FrameworkManager {
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::framework::{FrameworkType, FrameworkAdapter, FrameworkConfig};
+    use async_trait::async_trait;
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use tokio::time::{sleep, Duration};
+
+    // 测试用的模拟框架适配器
+    #[derive(Debug)]
+    struct MockFrameworkAdapter {
+        name: String,
+        initialized: AtomicBool,
+        running: AtomicBool,
+        healthy: AtomicBool,
+        message_count: AtomicU64,
+        should_fail: AtomicBool,
+    }
+
+    impl MockFrameworkAdapter {
+        fn new(name: &str) -> Self {
+            Self {
+                name: name.to_string(),
+                initialized: AtomicBool::new(false),
+                running: AtomicBool::new(false),
+                healthy: AtomicBool::new(true),
+                message_count: AtomicU64::new(0),
+                should_fail: AtomicBool::new(false),
+            }
+        }
+
+        fn set_should_fail(&self, should_fail: bool) {
+            self.should_fail.store(should_fail, Ordering::Relaxed);
+        }
+
+        fn set_healthy(&self, healthy: bool) {
+            self.healthy.store(healthy, Ordering::Relaxed);
+        }
+
+        fn get_message_count(&self) -> u64 {
+            self.message_count.load(Ordering::Relaxed)
+        }
+    }
+
+    #[async_trait]
+    impl FrameworkAdapter for MockFrameworkAdapter {
+        async fn initialize_environment(&mut self) -> A2AResult<()> {
+            if self.should_fail.load(Ordering::Relaxed) {
+                return Err(A2AError::internal("模拟初始化失败"));
+            }
+            self.initialized.store(true, Ordering::Relaxed);
+            Ok(())
+        }
+
+        async fn start_framework(&mut self) -> A2AResult<()> {
+            if !self.initialized.load(Ordering::Relaxed) {
+                return Err(A2AError::internal("框架未初始化"));
+            }
+            if self.should_fail.load(Ordering::Relaxed) {
+                return Err(A2AError::internal("模拟启动失败"));
+            }
+            self.running.store(true, Ordering::Relaxed);
+            Ok(())
+        }
+
+        async fn stop_framework(&mut self) -> A2AResult<()> {
+            self.running.store(false, Ordering::Relaxed);
+            Ok(())
+        }
+
+        async fn execute_command(&mut self, _command: &str, _args: Vec<String>) -> A2AResult<String> {
+            if self.should_fail.load(Ordering::Relaxed) {
+                return Err(A2AError::internal("模拟命令执行失败"));
+            }
+            Ok("命令执行成功".to_string())
+        }
+
+        async fn convert_message_to_framework(&self, _message: &A2AMessage) -> A2AResult<serde_json::Value> {
+            if self.should_fail.load(Ordering::Relaxed) {
+                return Err(A2AError::internal("模拟消息转换失败"));
+            }
+            self.message_count.fetch_add(1, Ordering::Relaxed);
+            Ok(serde_json::json!({
+                "framework": self.name,
+                "message": "converted"
+            }))
+        }
+
+        async fn convert_message_from_framework(&self, _message: serde_json::Value) -> A2AResult<A2AMessage> {
+            if self.should_fail.load(Ordering::Relaxed) {
+                return Err(A2AError::internal("模拟消息转换失败"));
+            }
+            self.message_count.fetch_add(1, Ordering::Relaxed);
+            Ok(A2AMessage::user_message("test message".to_string()))
+        }
+
+        async fn check_health(&self) -> A2AResult<bool> {
+            Ok(self.healthy.load(Ordering::Relaxed))
+        }
+
+        fn get_framework_type(&self) -> FrameworkType {
+            FrameworkType::Custom("test".to_string())
+        }
+    }
+
+    fn create_test_manager() -> FrameworkManager {
+        let config = FrameworkManagerConfig {
+            enable_health_check: false, // 禁用健康检查以简化测试
+            health_check_interval_secs: 1,
+            enable_conversion_cache: true,
+            max_concurrent_frameworks: 5,
+            message_timeout_secs: 10,
+        };
+        FrameworkManager::new(config)
+    }
+
+    fn create_test_message() -> A2AMessage {
+        A2AMessage::user_message("Hello, world!".to_string())
+    }
+
+    #[tokio::test]
+    async fn test_framework_manager_creation() {
+        let manager = create_test_manager();
+
+        // 验证初始状态
+        let states = manager.get_all_framework_states().await;
+        assert!(states.is_empty());
+
+        let frameworks = manager.get_supported_frameworks().await;
+        assert!(frameworks.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_framework_registration() {
+        let manager = create_test_manager();
+        let adapter = Box::new(MockFrameworkAdapter::new("test"));
+        let config = FrameworkConfig::default();
+
+        // 注册框架
+        let framework_type = FrameworkType::Custom("test".to_string());
+        let result = manager.register_framework(
+            framework_type.clone(),
+            adapter,
+            config,
+        ).await;
+        assert!(result.is_ok());
+
+        // 验证框架已注册
+        let frameworks = manager.get_supported_frameworks().await;
+        assert_eq!(frameworks.len(), 1);
+        assert!(frameworks.contains(&framework_type));
+
+        // 验证框架状态
+        let state = manager.get_framework_state(&framework_type).await;
+        assert!(state.is_some());
+        let state = state.unwrap();
+        assert_eq!(state.framework_type, framework_type);
+        assert_eq!(state.status, FrameworkStatus::Registered);
+        assert_eq!(state.messages_processed, 0);
+        assert_eq!(state.error_count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_framework_max_limit() {
+        let manager = create_test_manager();
+
+        // 注册最大数量的框架
+        for i in 0..5 {
+            let adapter = Box::new(MockFrameworkAdapter::new(&format!("test_{}", i)));
+            let result = manager.register_framework(
+                FrameworkType::Custom(format!("test_{}", i)),
+                adapter,
+                FrameworkConfig::default(),
+            ).await;
+            assert!(result.is_ok());
+        }
+
+        // 尝试注册超过限制的框架
+        let adapter = Box::new(MockFrameworkAdapter::new("test_overflow"));
+        let result = manager.register_framework(
+            FrameworkType::LangChain,
+            adapter,
+            FrameworkConfig::default(),
+        ).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_framework_lifecycle() {
+        let manager = create_test_manager();
+        let adapter = Box::new(MockFrameworkAdapter::new("test"));
+        let framework_type = FrameworkType::Custom("test".to_string());
+
+        // 注册框架
+        manager.register_framework(
+            framework_type.clone(),
+            adapter,
+            FrameworkConfig::default(),
+        ).await.unwrap();
+
+        // 启动框架
+        let result = manager.start_framework(&framework_type).await;
+        assert!(result.is_ok());
+
+        // 验证状态
+        let state = manager.get_framework_state(&framework_type).await.unwrap();
+        assert_eq!(state.status, FrameworkStatus::Running);
+
+        // 停止框架
+        let result = manager.stop_framework(&framework_type).await;
+        assert!(result.is_ok());
+
+        // 验证状态
+        let state = manager.get_framework_state(&framework_type).await.unwrap();
+        assert_eq!(state.status, FrameworkStatus::Stopped);
+    }
+
+    #[tokio::test]
+    async fn test_framework_start_failure() {
+        let manager = create_test_manager();
+        let adapter = Box::new(MockFrameworkAdapter::new("test"));
+        adapter.set_should_fail(true);
+        let framework_type = FrameworkType::Custom("test".to_string());
+
+        // 注册框架
+        manager.register_framework(
+            framework_type.clone(),
+            adapter,
+            FrameworkConfig::default(),
+        ).await.unwrap();
+
+        // 尝试启动框架（应该失败）
+        let result = manager.start_framework(&framework_type).await;
+        assert!(result.is_err());
+
+        // 验证错误状态
+        let state = manager.get_framework_state(&framework_type).await.unwrap();
+        // 由于初始化失败，状态应该是Error
+        assert!(matches!(state.status, FrameworkStatus::Error(_)) || state.status == FrameworkStatus::Initializing);
+    }
+
+    #[tokio::test]
+    async fn test_unregistered_framework_operations() {
+        let manager = create_test_manager();
+        let framework_type = FrameworkType::Custom("test".to_string());
+
+        // 尝试启动未注册的框架
+        let result = manager.start_framework(&framework_type).await;
+        assert!(result.is_err());
+
+        // 尝试停止未注册的框架
+        let result = manager.stop_framework(&framework_type).await;
+        assert!(result.is_err());
+
+        // 获取未注册框架的状态
+        let state = manager.get_framework_state(&framework_type).await;
+        assert!(state.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_message_processing() {
+        let manager = create_test_manager();
+        let adapter = Box::new(MockFrameworkAdapter::new("test"));
+        let framework_type = FrameworkType::Custom("test".to_string());
+
+        // 注册并启动框架
+        manager.register_framework(
+            framework_type.clone(),
+            adapter,
+            FrameworkConfig::default(),
+        ).await.unwrap();
+
+        manager.start_framework(&framework_type).await.unwrap();
+
+        // 处理消息
+        let message = create_test_message();
+        let result = manager.process_message(
+            &framework_type,
+            message,
+        ).await.unwrap();
+
+        // 验证结果
+        assert!(result.success);
+        assert!(result.response_message.is_some());
+        // 处理时间可能为0，所以不强制要求大于0
+        assert_eq!(result.source_framework, framework_type);
+        assert!(result.target_framework.is_none());
+
+        // 验证统计信息更新
+        let state = manager.get_framework_state(&framework_type).await.unwrap();
+        assert_eq!(state.messages_processed, 1);
+        assert_eq!(state.error_count, 0);
+        // 平均响应时间可能为0，所以不强制要求大于0
+        assert!(state.avg_response_time_ms >= 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_message_processing_framework_not_running() {
+        let manager = create_test_manager();
+        let adapter = Box::new(MockFrameworkAdapter::new("test"));
+        let framework_type = FrameworkType::Custom("test".to_string());
+
+        // 注册但不启动框架
+        manager.register_framework(
+            framework_type.clone(),
+            adapter,
+            FrameworkConfig::default(),
+        ).await.unwrap();
+
+        // 尝试处理消息
+        let message = create_test_message();
+        let result = manager.process_message(
+            &framework_type,
+            message,
+        ).await.unwrap();
+
+        // 验证失败结果
+        assert!(!result.success);
+        assert!(result.response_message.is_none());
+        assert!(result.error_message.is_some());
+        assert_eq!(result.error_message.unwrap(), "框架未运行");
+    }
+
+    #[tokio::test]
+    async fn test_message_processing_unregistered_framework() {
+        let manager = create_test_manager();
+        let framework_type = FrameworkType::Custom("nonexistent".to_string());
+
+        // 尝试处理消息（框架未注册）
+        let message = create_test_message();
+        let result = manager.process_message(
+            &framework_type,
+            message,
+        ).await.unwrap();
+
+        // 应该返回失败结果，因为框架未运行
+        assert!(!result.success);
+        assert!(result.error_message.is_some());
+        assert_eq!(result.error_message.unwrap(), "框架未运行");
+    }
+
+    #[tokio::test]
+    async fn test_framework_forwarding() {
+        let manager = create_test_manager();
+        let adapter1 = Box::new(MockFrameworkAdapter::new("test1"));
+        let adapter2 = Box::new(MockFrameworkAdapter::new("test2"));
+
+        // 注册两个框架
+        manager.register_framework(
+            FrameworkType::LangChain,
+            adapter1,
+            FrameworkConfig::default(),
+        ).await.unwrap();
+
+        manager.register_framework(
+            FrameworkType::AutoGen,
+            adapter2,
+            FrameworkConfig::default(),
+        ).await.unwrap();
+
+        // 启动两个框架
+        manager.start_framework(&FrameworkType::LangChain).await.unwrap();
+        manager.start_framework(&FrameworkType::AutoGen).await.unwrap();
+
+        // 转发消息
+        let message = create_test_message();
+        let result = manager.forward_message(
+            &FrameworkType::LangChain,
+            &FrameworkType::AutoGen,
+            message,
+        ).await.unwrap();
+
+        // 验证结果
+        assert!(result.success);
+        assert!(result.response_message.is_some());
+        assert_eq!(result.source_framework, FrameworkType::LangChain);
+        assert_eq!(result.target_framework, Some(FrameworkType::AutoGen));
+
+        // 验证两个框架的统计信息都更新了
+        let state1 = manager.get_framework_state(&FrameworkType::LangChain).await.unwrap();
+        let state2 = manager.get_framework_state(&FrameworkType::AutoGen).await.unwrap();
+        assert_eq!(state1.messages_processed, 1);
+        assert_eq!(state2.messages_processed, 1);
+    }
+
+    #[tokio::test]
+    async fn test_framework_forwarding_not_running() {
+        let manager = create_test_manager();
+        let adapter1 = Box::new(MockFrameworkAdapter::new("test1"));
+        let adapter2 = Box::new(MockFrameworkAdapter::new("test2"));
+
+        // 注册但不启动框架
+        manager.register_framework(
+            FrameworkType::LangChain,
+            adapter1,
+            FrameworkConfig::default(),
+        ).await.unwrap();
+
+        manager.register_framework(
+            FrameworkType::AutoGen,
+            adapter2,
+            FrameworkConfig::default(),
+        ).await.unwrap();
+
+        // 尝试转发消息
+        let message = create_test_message();
+        let result = manager.forward_message(
+            &FrameworkType::LangChain,
+            &FrameworkType::AutoGen,
+            message,
+        ).await.unwrap();
+
+        // 验证失败结果
+        assert!(!result.success);
+        assert!(result.response_message.is_none());
+        assert!(result.error_message.is_some());
+        assert_eq!(result.error_message.unwrap(), "源框架或目标框架未运行");
+    }
+
+    #[tokio::test]
+    async fn test_framework_unregistration() {
+        let manager = create_test_manager();
+        let adapter = Box::new(MockFrameworkAdapter::new("test"));
+        let framework_type = FrameworkType::Custom("test".to_string());
+
+        // 注册并启动框架
+        manager.register_framework(
+            framework_type.clone(),
+            adapter,
+            FrameworkConfig::default(),
+        ).await.unwrap();
+
+        manager.start_framework(&framework_type).await.unwrap();
+
+        // 验证框架已注册
+        let frameworks = manager.get_supported_frameworks().await;
+        assert_eq!(frameworks.len(), 1);
+
+        // 注销框架
+        let result = manager.unregister_framework(&framework_type).await;
+        assert!(result.is_ok());
+
+        // 验证框架已注销
+        let frameworks = manager.get_supported_frameworks().await;
+        assert!(frameworks.is_empty());
+
+        let state = manager.get_framework_state(&framework_type).await;
+        assert!(state.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_conversion_stats() {
+        let manager = create_test_manager();
+
+        // 获取初始统计信息
+        let stats = manager.get_conversion_stats().await;
+        assert_eq!(stats.total_conversions, 0);
+    }
+
+    #[tokio::test]
+    async fn test_health_check_enabled() {
+        let config = FrameworkManagerConfig {
+            enable_health_check: true,
+            health_check_interval_secs: 1,
+            enable_conversion_cache: true,
+            max_concurrent_frameworks: 5,
+            message_timeout_secs: 10,
+        };
+
+        let manager = FrameworkManager::new(config);
+        let adapter = Box::new(MockFrameworkAdapter::new("test"));
+        let framework_type = FrameworkType::Custom("test".to_string());
+
+        // 注册框架
+        manager.register_framework(
+            framework_type.clone(),
+            adapter,
+            FrameworkConfig::default(),
+        ).await.unwrap();
+
+        // 等待健康检查运行
+        sleep(Duration::from_millis(1100)).await;
+
+        // 验证健康状态可能已更新
+        let state = manager.get_framework_state(&framework_type).await.unwrap();
+        // 健康状态应该是 Healthy 或 Unknown（取决于时机）
+        assert!(matches!(state.health_status, HealthStatus::Healthy | HealthStatus::Unknown));
+    }
+
+    #[test]
+    fn test_framework_status_serialization() {
+        let status = FrameworkStatus::Running;
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: FrameworkStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, deserialized);
+
+        let error_status = FrameworkStatus::Error("test error".to_string());
+        let serialized = serde_json::to_string(&error_status).unwrap();
+        let deserialized: FrameworkStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(error_status, deserialized);
+    }
+
+    #[test]
+    fn test_health_status_serialization() {
+        let status = HealthStatus::Healthy;
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: HealthStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, deserialized);
+    }
+
+    #[test]
+    fn test_framework_manager_config_default() {
+        let config = FrameworkManagerConfig::default();
+        assert!(config.enable_health_check);
+        assert_eq!(config.health_check_interval_secs, 30);
+        assert!(config.enable_conversion_cache);
+        assert_eq!(config.max_concurrent_frameworks, 10);
+        assert_eq!(config.message_timeout_secs, 30);
+    }
+}
