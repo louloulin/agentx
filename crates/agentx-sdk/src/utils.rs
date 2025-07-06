@@ -325,7 +325,7 @@ impl ValidationUtils {
     
     /// 验证端口号
     pub fn validate_port(port: u16) -> bool {
-        port > 0 && port <= 65535
+        port > 0
     }
     
     /// 验证框架名称

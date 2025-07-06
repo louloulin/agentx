@@ -546,10 +546,12 @@ mod tests {
             self.should_fail.store(should_fail, Ordering::Relaxed);
         }
 
+        #[allow(dead_code)]
         fn set_healthy(&self, healthy: bool) {
             self.healthy.store(healthy, Ordering::Relaxed);
         }
 
+        #[allow(dead_code)]
         fn get_message_count(&self) -> u64 {
             self.message_count.load(Ordering::Relaxed)
         }

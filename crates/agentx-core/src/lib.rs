@@ -12,6 +12,8 @@ pub mod performance_analyzer;
 pub mod real_network_benchmarks;
 pub mod distributed_tracing;
 pub mod plugin_marketplace;
+pub mod performance_benchmarks;
+pub mod advanced_monitoring;
 pub mod error_recovery;
 
 // 重新导出主要类型
@@ -23,6 +25,8 @@ pub use performance_analyzer::{PerformanceAnalyzer, PerformanceConfig, Benchmark
 pub use real_network_benchmarks::{RealNetworkBenchmarks, RealNetworkConfig, RealNetworkBenchmarkResult};
 pub use distributed_tracing::{DistributedTracingManager, TracingConfig, TraceSession, Span, TraceStatus, SpanStatus};
 pub use plugin_marketplace::{PluginMarketplace, MarketplaceConfig, PluginPackage, PluginCategory, SearchQuery, SearchResult};
+pub use performance_benchmarks::{PerformanceBenchmarkManager, BenchmarkConfig, BenchmarkResult as PerfBenchmarkResult};
+pub use advanced_monitoring::{AdvancedMonitoringManager, MonitoringConfig, SystemMetrics, AlertRule, Alert, Dashboard};
 pub use error_recovery::{ErrorRecoveryManager, ErrorRecoveryConfig, ComponentStatus, ErrorType, RecoveryStrategy};
 
 /// AgentX核心版本

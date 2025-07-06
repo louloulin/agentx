@@ -78,6 +78,7 @@ pub struct BenchmarkManager {
     /// 测试结果历史
     results_history: Vec<BenchmarkResult>,
     /// 当前运行的测试
+    #[allow(dead_code)]
     running_tests: HashMap<String, RunningBenchmark>,
 }
 
@@ -259,8 +260,10 @@ pub struct PerformanceMonitor {
     /// 监控指标
     metrics: HashMap<String, MetricTimeSeries>,
     /// 告警规则
+    #[allow(dead_code)]
     alert_rules: Vec<AlertRule>,
     /// 活跃告警
+    #[allow(dead_code)]
     active_alerts: Vec<Alert>,
 }
 

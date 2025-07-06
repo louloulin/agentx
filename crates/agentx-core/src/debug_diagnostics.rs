@@ -59,8 +59,10 @@ pub struct PerformanceProfiler {
     /// 调用栈跟踪
     call_traces: Vec<CallTrace>,
     /// 内存使用情况
+    #[allow(dead_code)]
     memory_usage: Vec<MemorySnapshot>,
     /// CPU使用情况
+    #[allow(dead_code)]
     cpu_usage: Vec<CpuSnapshot>,
 }
 
@@ -142,8 +144,10 @@ pub struct SystemDiagnostics {
     /// 组件状态
     component_status: HashMap<String, ComponentHealth>,
     /// 依赖检查结果
+    #[allow(dead_code)]
     dependency_checks: Vec<DependencyCheck>,
     /// 配置验证结果
+    #[allow(dead_code)]
     config_validation: Vec<ConfigValidation>,
 }
 
@@ -232,6 +236,7 @@ pub struct ConfigValidation {
 #[derive(Debug)]
 pub struct LogAnalyzer {
     /// 日志条目
+    #[allow(dead_code)]
     log_entries: Vec<LogEntry>,
     /// 错误模式
     error_patterns: Vec<ErrorPattern>,
@@ -300,10 +305,13 @@ pub struct NetworkDiagnostics {
     /// 连接状态
     connections: Vec<ConnectionStatus>,
     /// 延迟测试结果
+    #[allow(dead_code)]
     latency_tests: Vec<LatencyTest>,
     /// 带宽测试结果
+    #[allow(dead_code)]
     bandwidth_tests: Vec<BandwidthTest>,
     /// DNS解析测试
+    #[allow(dead_code)]
     dns_tests: Vec<DnsTest>,
 }
 

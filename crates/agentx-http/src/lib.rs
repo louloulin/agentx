@@ -15,11 +15,11 @@ pub mod response;
 pub use server::*;
 pub use handlers::*;
 pub use middleware::*;
-pub use models::*;
+pub use models::{RegisterAgentRequest, AgentResponse, CreateTaskRequest, CreateMessageRequest};
 pub use error::*;
 pub use config::*;
 pub use docs::*;
-pub use response::*;
+pub use response::{ApiResponse, StatusResponse, VersionResponse, EmptyResponse};
 
 /// HTTP API版本
 pub const API_VERSION: &str = "v1";

@@ -12,7 +12,7 @@ use tracing::{debug, warn};
 
 /// 缓存条目
 #[derive(Debug, Clone)]
-struct CacheEntry<T> {
+pub struct CacheEntry<T> {
     /// 缓存的值
     value: T,
     /// 创建时间

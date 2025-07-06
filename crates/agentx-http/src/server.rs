@@ -205,6 +205,7 @@ impl HttpServer {
     }
     
     /// OpenAPI文档处理器
+    #[allow(dead_code)]
     async fn openapi_handler() -> HttpApiResult<Json<utoipa::openapi::OpenApi>> {
         Ok(Json(ApiDoc::create()))
     }

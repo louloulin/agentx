@@ -63,21 +63,20 @@ impl Default for HttpServerConfig {
 impl HttpServerConfig {
     /// 从环境变量加载配置
     pub fn from_env() -> Result<Self, config::ConfigError> {
-        let mut cfg = config::Config::builder()
+        let cfg = config::Config::builder()
+            // 设置默认值
+            .set_default("host", "0.0.0.0")?
+            .set_default("port", 8080)?
+            .set_default("enable_cors", true)?
+            .set_default("enable_request_logging", true)?
+            .set_default("enable_compression", true)?
+            .set_default("request_timeout", 30)?
+            .set_default("max_request_size", 10 * 1024 * 1024)?
+            .set_default("enable_docs", true)?
+            .set_default("docs_path", "/docs")?
             .add_source(config::Environment::with_prefix("AGENTX_HTTP"))
             .build()?;
-        
-        // 设置默认值
-        cfg.set_default("host", "0.0.0.0")?;
-        cfg.set_default("port", 8080)?;
-        cfg.set_default("enable_cors", true)?;
-        cfg.set_default("enable_request_logging", true)?;
-        cfg.set_default("enable_compression", true)?;
-        cfg.set_default("request_timeout", 30)?;
-        cfg.set_default("max_request_size", 10 * 1024 * 1024)?;
-        cfg.set_default("enable_docs", true)?;
-        cfg.set_default("docs_path", "/docs")?;
-        
+
         cfg.try_deserialize()
     }
     

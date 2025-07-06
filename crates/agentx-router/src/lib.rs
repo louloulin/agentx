@@ -12,8 +12,8 @@ pub mod error;
 
 pub use router::*;
 pub use strategy::*;
-pub use metrics::*;
-pub use cache::*;
+pub use metrics::{RouteStats, AgentStats, RouterMetrics};
+pub use cache::{RouteCache, CacheConfig, CacheEntry};
 pub use error::*;
 
 #[cfg(test)]
