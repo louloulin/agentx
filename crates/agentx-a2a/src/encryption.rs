@@ -8,6 +8,12 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
 use tracing::{debug, info};
+use rand::{RngCore, rngs::OsRng};
+use sha2::{Sha256, Digest};
+use hmac::{Hmac, Mac};
+use aes_gcm::{Aes256Gcm, Key, Nonce, aead::{Aead, KeyInit}};
+use chacha20poly1305::{ChaCha20Poly1305, Key as ChaChaKey, Nonce as ChaChaNonce};
+use std::convert::TryInto;
 
 /// 加密管理器
 pub struct EncryptionManager {
@@ -390,55 +396,81 @@ impl EncryptionManager {
     // 私有方法
 
     fn generate_random_key(&self) -> A2AResult<Vec<u8>> {
-        // 这里应该使用加密安全的随机数生成器
-        // 为了简化，我们使用模拟数据
         let mut key = vec![0u8; self.config.key_length];
-        for (i, byte) in key.iter_mut().enumerate() {
-            *byte = (i % 256) as u8; // 简化的随机数生成
-        }
+        OsRng.fill_bytes(&mut key);
         Ok(key)
     }
 
     fn encrypt_aes256gcm(&self, key: &EncryptionKey, plaintext: &[u8]) -> A2AResult<EncryptedMessage> {
-        // 简化的AES-256-GCM加密实现
-        // 实际应该使用真正的加密库
-        let iv = vec![0u8; 12]; // 96-bit IV for GCM
-        let encrypted_data = plaintext.to_vec(); // 简化：不实际加密
-        let auth_tag = vec![0u8; 16]; // 128-bit auth tag
+        let aes_key = Key::<Aes256Gcm>::from_slice(&key.key_data);
+        let cipher = Aes256Gcm::new(aes_key);
+
+        // 生成随机IV/nonce
+        let mut iv = vec![0u8; 12]; // 96-bit IV for GCM
+        OsRng.fill_bytes(&mut iv);
+        let nonce = Nonce::from_slice(&iv);
+
+        // 执行加密
+        let encrypted_data = cipher.encrypt(nonce, plaintext)
+            .map_err(|e| A2AError::internal(format!("AES-256-GCM加密失败: {}", e)))?;
 
         Ok(EncryptedMessage {
             key_id: key.key_id.clone(),
             algorithm: EncryptionAlgorithm::AES256GCM,
             iv,
             encrypted_data,
-            auth_tag: Some(auth_tag),
+            auth_tag: None, // GCM模式的认证标签已包含在encrypted_data中
             aad: None,
         })
     }
 
-    fn decrypt_aes256gcm(&self, _key: &EncryptionKey, encrypted_msg: &EncryptedMessage) -> A2AResult<Vec<u8>> {
-        // 简化的AES-256-GCM解密实现
-        Ok(encrypted_msg.encrypted_data.clone())
+    fn decrypt_aes256gcm(&self, key: &EncryptionKey, encrypted_msg: &EncryptedMessage) -> A2AResult<Vec<u8>> {
+        let aes_key = Key::<Aes256Gcm>::from_slice(&key.key_data);
+        let cipher = Aes256Gcm::new(aes_key);
+
+        let nonce = Nonce::from_slice(&encrypted_msg.iv);
+
+        // 执行解密
+        let plaintext = cipher.decrypt(nonce, encrypted_msg.encrypted_data.as_ref())
+            .map_err(|e| A2AError::internal(format!("AES-256-GCM解密失败: {}", e)))?;
+
+        Ok(plaintext)
     }
 
     fn encrypt_chacha20poly1305(&self, key: &EncryptionKey, plaintext: &[u8]) -> A2AResult<EncryptedMessage> {
-        // 简化的ChaCha20-Poly1305加密实现
-        let iv = vec![0u8; 12]; // 96-bit nonce
-        let encrypted_data = plaintext.to_vec();
-        let auth_tag = vec![0u8; 16];
+        let chacha_key = ChaChaKey::from_slice(&key.key_data);
+        let cipher = ChaCha20Poly1305::new(chacha_key);
+
+        // 生成随机nonce
+        let mut iv = vec![0u8; 12]; // 96-bit nonce
+        OsRng.fill_bytes(&mut iv);
+        let nonce = ChaChaNonce::from_slice(&iv);
+
+        // 执行加密
+        let encrypted_data = cipher.encrypt(nonce, plaintext)
+            .map_err(|e| A2AError::internal(format!("ChaCha20-Poly1305加密失败: {}", e)))?;
 
         Ok(EncryptedMessage {
             key_id: key.key_id.clone(),
             algorithm: EncryptionAlgorithm::ChaCha20Poly1305,
             iv,
             encrypted_data,
-            auth_tag: Some(auth_tag),
+            auth_tag: None, // Poly1305的认证标签已包含在encrypted_data中
             aad: None,
         })
     }
 
-    fn decrypt_chacha20poly1305(&self, _key: &EncryptionKey, encrypted_msg: &EncryptedMessage) -> A2AResult<Vec<u8>> {
-        Ok(encrypted_msg.encrypted_data.clone())
+    fn decrypt_chacha20poly1305(&self, key: &EncryptionKey, encrypted_msg: &EncryptedMessage) -> A2AResult<Vec<u8>> {
+        let chacha_key = ChaChaKey::from_slice(&key.key_data);
+        let cipher = ChaCha20Poly1305::new(chacha_key);
+
+        let nonce = ChaChaNonce::from_slice(&encrypted_msg.iv);
+
+        // 执行解密
+        let plaintext = cipher.decrypt(nonce, encrypted_msg.encrypted_data.as_ref())
+            .map_err(|e| A2AError::internal(format!("ChaCha20-Poly1305解密失败: {}", e)))?;
+
+        Ok(plaintext)
     }
 
     fn encrypt_xchacha20poly1305(&self, key: &EncryptionKey, plaintext: &[u8]) -> A2AResult<EncryptedMessage> {
@@ -472,9 +504,155 @@ impl EncryptionManager {
 
     fn generate_key_pair_for_exchange(&mut self) -> A2AResult<(Vec<u8>, String)> {
         // 简化的密钥对生成
-        let public_key = vec![1u8; 32]; // 模拟公钥
+        let mut public_key = vec![0u8; 32]; // 模拟公钥
+        OsRng.fill_bytes(&mut public_key);
         let shared_key_id = self.generate_key(KeyPurpose::KeyExchange)?;
-        
+
         Ok((public_key, shared_key_id))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_encryption_manager() -> EncryptionManager {
+        let config = EncryptionConfig::default();
+        EncryptionManager::new(config)
+    }
+
+    #[test]
+    fn test_encryption_manager_creation() {
+        let manager = create_test_encryption_manager();
+        assert_eq!(manager.key_store.len(), 0);
+        assert_eq!(manager.config.default_algorithm, EncryptionAlgorithm::AES256GCM);
+    }
+
+    #[test]
+    fn test_key_generation() {
+        let mut manager = create_test_encryption_manager();
+
+        let key_id = manager.generate_key(KeyPurpose::MessageEncryption).unwrap();
+        assert!(!key_id.is_empty());
+
+        let key_info = manager.get_key_info(&key_id).unwrap();
+        assert_eq!(key_info.purpose, KeyPurpose::MessageEncryption);
+        assert_eq!(key_info.status, KeyStatus::Active);
+        assert_eq!(key_info.key_data.len(), 32); // 256 bits
+    }
+
+    #[test]
+    fn test_aes256gcm_encryption_decryption() {
+        let mut manager = create_test_encryption_manager();
+        let key_id = manager.generate_key(KeyPurpose::MessageEncryption).unwrap();
+
+        let plaintext = b"Hello, this is a test message for AES-256-GCM encryption!";
+
+        // 加密
+        let encrypted_msg = manager.encrypt_message(&key_id, plaintext).unwrap();
+        assert_eq!(encrypted_msg.algorithm, EncryptionAlgorithm::AES256GCM);
+        assert_eq!(encrypted_msg.iv.len(), 12); // 96-bit IV
+        assert_ne!(encrypted_msg.encrypted_data, plaintext.to_vec()); // 确保已加密
+
+        // 解密
+        let decrypted = manager.decrypt_message(&encrypted_msg).unwrap();
+        assert_eq!(decrypted, plaintext.to_vec());
+    }
+
+    #[test]
+    fn test_chacha20poly1305_encryption_decryption() {
+        let mut manager = EncryptionManager::new(EncryptionConfig {
+            default_algorithm: EncryptionAlgorithm::ChaCha20Poly1305,
+            ..Default::default()
+        });
+
+        let key_id = manager.generate_key(KeyPurpose::MessageEncryption).unwrap();
+        let plaintext = b"Hello, this is a test message for ChaCha20-Poly1305 encryption!";
+
+        // 加密
+        let encrypted_msg = manager.encrypt_message(&key_id, plaintext).unwrap();
+        assert_eq!(encrypted_msg.algorithm, EncryptionAlgorithm::ChaCha20Poly1305);
+        assert_eq!(encrypted_msg.iv.len(), 12); // 96-bit nonce
+        assert_ne!(encrypted_msg.encrypted_data, plaintext.to_vec());
+
+        // 解密
+        let decrypted = manager.decrypt_message(&encrypted_msg).unwrap();
+        assert_eq!(decrypted, plaintext.to_vec());
+    }
+
+    #[test]
+    fn test_key_rotation() {
+        let mut manager = create_test_encryption_manager();
+        let old_key_id = manager.generate_key(KeyPurpose::MessageEncryption).unwrap();
+
+        let new_key_id = manager.rotate_key(&old_key_id, "测试轮换".to_string()).unwrap();
+        assert_ne!(old_key_id, new_key_id);
+
+        // 检查旧密钥状态
+        let old_key = manager.get_key_info(&old_key_id).unwrap();
+        assert_eq!(old_key.status, KeyStatus::Rotated);
+
+        // 检查新密钥状态
+        let new_key = manager.get_key_info(&new_key_id).unwrap();
+        assert_eq!(new_key.status, KeyStatus::Active);
+
+        // 检查轮换历史
+        let history = manager.get_key_rotation_history();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].old_key_id, old_key_id);
+        assert_eq!(history[0].new_key_id, new_key_id);
+    }
+
+    #[test]
+    fn test_encryption_with_invalid_key() {
+        let manager = create_test_encryption_manager();
+        let result = manager.encrypt_message("invalid_key_id", b"test");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_algorithm_support() {
+        let manager = create_test_encryption_manager();
+
+        assert!(manager.is_algorithm_supported(&EncryptionAlgorithm::AES256GCM));
+        assert!(manager.is_algorithm_supported(&EncryptionAlgorithm::ChaCha20Poly1305));
+        assert!(manager.is_algorithm_supported(&EncryptionAlgorithm::None));
+        assert!(!manager.is_algorithm_supported(&EncryptionAlgorithm::RSAOAEP));
+    }
+
+    #[test]
+    fn test_key_exchange_request_handling() {
+        let mut manager = create_test_encryption_manager();
+
+        let request = KeyExchangeRequest {
+            request_id: "test_request".to_string(),
+            initiator_agent_id: "agent1".to_string(),
+            target_agent_id: "agent2".to_string(),
+            public_key: vec![1u8; 32],
+            supported_algorithms: vec![
+                EncryptionAlgorithm::AES256GCM,
+                EncryptionAlgorithm::ChaCha20Poly1305,
+            ],
+            timestamp: Utc::now(),
+        };
+
+        let response = manager.handle_key_exchange_request(&request).unwrap();
+        assert_eq!(response.status, KeyExchangeStatus::Success);
+        assert!(response.public_key.is_some());
+        assert!(response.selected_algorithm.is_some());
+        assert!(response.shared_key_id.is_some());
+    }
+
+    #[test]
+    fn test_random_key_generation() {
+        let manager = create_test_encryption_manager();
+
+        let key1 = manager.generate_random_key().unwrap();
+        let key2 = manager.generate_random_key().unwrap();
+
+        // 确保生成的密钥不同（随机性测试）
+        assert_ne!(key1, key2);
+        assert_eq!(key1.len(), 32);
+        assert_eq!(key2.len(), 32);
     }
 }

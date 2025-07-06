@@ -11,6 +11,8 @@ categories = ["development-tools", "api-bindings"]
 [dependencies]
 # AgentX依赖
 agentx-a2a = { path = "../agentx-a2a" }
+agentx-cluster = { path = "../agentx-cluster" }
+agentx-router = { path = "../agentx-router" }
 
 # 异步运行时
 tokio = { version = "1.0", features = ["full"] }

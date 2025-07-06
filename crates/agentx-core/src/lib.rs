@@ -9,6 +9,7 @@ pub mod cicd_pipeline;
 pub mod developer_ecosystem;
 pub mod debug_diagnostics;
 pub mod performance_analyzer;
+pub mod real_network_benchmarks;
 pub mod error_recovery;
 
 // 重新导出主要类型
@@ -17,6 +18,7 @@ pub use cloud_native::{CloudNativeManager, KubernetesConfig, DockerConfig, Cloud
 pub use developer_ecosystem::{DeveloperEcosystemManager, PluginMarketManager, CliToolManager};
 pub use debug_diagnostics::{DebugDiagnosticsManager, DiagnosticsConfig, SystemDiagnosticsReport};
 pub use performance_analyzer::{PerformanceAnalyzer, PerformanceConfig, BenchmarkResult};
+pub use real_network_benchmarks::{RealNetworkBenchmarks, RealNetworkConfig, RealNetworkBenchmarkResult};
 pub use error_recovery::{ErrorRecoveryManager, ErrorRecoveryConfig, ComponentStatus, ErrorType, RecoveryStrategy};
 
 /// AgentX核心版本
