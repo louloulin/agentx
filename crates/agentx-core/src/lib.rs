@@ -10,6 +10,7 @@ pub mod developer_ecosystem;
 pub mod debug_diagnostics;
 pub mod performance_analyzer;
 pub mod real_network_benchmarks;
+pub mod distributed_tracing;
 pub mod error_recovery;
 
 // 重新导出主要类型
@@ -19,6 +20,7 @@ pub use developer_ecosystem::{DeveloperEcosystemManager, PluginMarketManager, Cl
 pub use debug_diagnostics::{DebugDiagnosticsManager, DiagnosticsConfig, SystemDiagnosticsReport};
 pub use performance_analyzer::{PerformanceAnalyzer, PerformanceConfig, BenchmarkResult};
 pub use real_network_benchmarks::{RealNetworkBenchmarks, RealNetworkConfig, RealNetworkBenchmarkResult};
+pub use distributed_tracing::{DistributedTracingManager, TracingConfig, TraceSession, Span, TraceStatus, SpanStatus};
 pub use error_recovery::{ErrorRecoveryManager, ErrorRecoveryConfig, ComponentStatus, ErrorType, RecoveryStrategy};
 
 /// AgentX核心版本
