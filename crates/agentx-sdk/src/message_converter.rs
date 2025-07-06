@@ -478,3 +478,246 @@ impl Default for MessageConverter {
         Self::new()
     }
 }
+
+impl MessageConverter {
+    /// 增强的批量转换功能
+    pub fn batch_convert_from_a2a(
+        &mut self,
+        messages: &[A2AMessage],
+        target_framework: FrameworkType,
+    ) -> A2AResult<Vec<Value>> {
+        let mut results = Vec::new();
+        let mut errors = Vec::new();
+
+        for (index, message) in messages.iter().enumerate() {
+            match self.convert_from_a2a(message, target_framework.clone()) {
+                Ok(converted) => results.push(converted),
+                Err(e) => {
+                    errors.push(format!("消息 {} 转换失败: {}", index, e));
+                    // 继续处理其他消息，而不是立即失败
+                }
+            }
+        }
+
+        if !errors.is_empty() {
+            warn!("批量转换中有 {} 个消息失败: {:?}", errors.len(), errors);
+        }
+
+        Ok(results)
+    }
+
+    /// 增强的批量转换到A2A格式
+    pub fn batch_convert_to_a2a(
+        &mut self,
+        messages: Vec<Value>,
+        source_framework: FrameworkType,
+    ) -> A2AResult<Vec<A2AMessage>> {
+        let mut results = Vec::new();
+        let mut errors = Vec::new();
+
+        for (index, message) in messages.into_iter().enumerate() {
+            match self.convert_to_a2a(message, source_framework.clone()) {
+                Ok(converted) => results.push(converted),
+                Err(e) => {
+                    errors.push(format!("消息 {} 转换失败: {}", index, e));
+                }
+            }
+        }
+
+        if !errors.is_empty() {
+            warn!("批量转换中有 {} 个消息失败: {:?}", errors.len(), errors);
+        }
+
+        Ok(results)
+    }
+
+    /// 验证转换结果的完整性
+    pub fn validate_conversion(
+        &self,
+        _original: &A2AMessage,
+        converted: &Value,
+        target_framework: FrameworkType,
+    ) -> A2AResult<bool> {
+        // 基本验证：检查必要字段是否存在
+        match target_framework {
+            FrameworkType::LangChain => {
+                let has_role = converted.get("role").is_some();
+                let has_content = converted.get("content").is_some();
+                Ok(has_role && has_content)
+            }
+            FrameworkType::AutoGen => {
+                let has_role = converted.get("role").is_some();
+                let has_content = converted.get("content").is_some();
+                Ok(has_role && has_content)
+            }
+            FrameworkType::Mastra => {
+                let has_role = converted.get("role").is_some();
+                let has_content = converted.get("content").is_some();
+                Ok(has_role && has_content)
+            }
+            _ => Ok(true), // 对其他框架暂时返回true
+        }
+    }
+
+    /// 获取支持的转换路径
+    pub fn get_supported_conversions(&self) -> Vec<(FrameworkType, FrameworkType)> {
+        vec![
+            (FrameworkType::LangChain, FrameworkType::AutoGen),
+            (FrameworkType::LangChain, FrameworkType::Mastra),
+            (FrameworkType::AutoGen, FrameworkType::LangChain),
+            (FrameworkType::AutoGen, FrameworkType::Mastra),
+            (FrameworkType::Mastra, FrameworkType::LangChain),
+            (FrameworkType::Mastra, FrameworkType::AutoGen),
+            // 可以继续添加更多转换路径
+        ]
+    }
+
+    /// 检查是否支持特定的转换路径
+    pub fn supports_conversion(&self, source: &FrameworkType, target: &FrameworkType) -> bool {
+        self.get_supported_conversions().contains(&(source.clone(), target.clone()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agentx_a2a::{MessagePart, TextPart};
+    use serde_json::json;
+
+    fn create_test_a2a_message() -> A2AMessage {
+        A2AMessage {
+            message_id: "test_msg_001".to_string(),
+            role: MessageRole::User,
+            parts: vec![MessagePart::Text(TextPart {
+                text: "Hello, this is a test message".to_string(),
+                metadata: HashMap::new(),
+            })],
+            task_id: None,
+            context_id: None,
+            metadata: {
+                let mut meta = HashMap::new();
+                meta.insert("test_key".to_string(), json!("test_value"));
+                meta
+            },
+        }
+    }
+
+    #[test]
+    fn test_message_converter_creation() {
+        let converter = MessageConverter::new();
+        assert_eq!(converter.stats.total_conversions, 0);
+        assert_eq!(converter.stats.successful_conversions, 0);
+        assert_eq!(converter.stats.failed_conversions, 0);
+    }
+
+    #[test]
+    fn test_convert_to_langchain() {
+        let mut converter = MessageConverter::new();
+        let message = create_test_a2a_message();
+
+        let result = converter.convert_from_a2a(&message, FrameworkType::LangChain);
+        assert!(result.is_ok());
+
+        let converted = result.unwrap();
+        assert_eq!(converted["role"], "human");
+        assert_eq!(converted["content"], "Hello, this is a test message");
+        assert!(converted.get("additional_kwargs").is_some());
+
+        // 验证统计信息更新
+        assert_eq!(converter.stats.total_conversions, 1);
+        assert_eq!(converter.stats.successful_conversions, 1);
+    }
+
+    #[test]
+    fn test_convert_to_autogen() {
+        let mut converter = MessageConverter::new();
+        let message = create_test_a2a_message();
+
+        let result = converter.convert_from_a2a(&message, FrameworkType::AutoGen);
+        assert!(result.is_ok());
+
+        let converted = result.unwrap();
+        assert_eq!(converted["role"], "user");
+        assert_eq!(converted["content"], "Hello, this is a test message");
+        assert!(converted.get("metadata").is_some());
+    }
+
+    #[test]
+    fn test_batch_conversion() {
+        let mut converter = MessageConverter::new();
+        let messages = vec![
+            create_test_a2a_message(),
+            create_test_a2a_message(),
+        ];
+
+        let result = converter.batch_convert_from_a2a(&messages, FrameworkType::LangChain);
+        assert!(result.is_ok());
+
+        let converted_messages = result.unwrap();
+        assert_eq!(converted_messages.len(), 2);
+
+        // 验证统计信息
+        assert_eq!(converter.stats.total_conversions, 2);
+        assert_eq!(converter.stats.successful_conversions, 2);
+    }
+
+    #[test]
+    fn test_conversion_validation() {
+        let converter = MessageConverter::new();
+        let message = create_test_a2a_message();
+
+        let valid_langchain = json!({
+            "role": "human",
+            "content": "test content"
+        });
+
+        let result = converter.validate_conversion(&message, &valid_langchain, FrameworkType::LangChain);
+        assert!(result.is_ok());
+        assert!(result.unwrap());
+
+        let invalid_langchain = json!({
+            "role": "human"
+            // 缺少content字段
+        });
+
+        let result = converter.validate_conversion(&message, &invalid_langchain, FrameworkType::LangChain);
+        assert!(result.is_ok());
+        assert!(!result.unwrap());
+    }
+
+    #[test]
+    fn test_supported_conversions() {
+        let converter = MessageConverter::new();
+        let conversions = converter.get_supported_conversions();
+
+        assert!(!conversions.is_empty());
+        assert!(converter.supports_conversion(&FrameworkType::LangChain, &FrameworkType::AutoGen));
+        assert!(converter.supports_conversion(&FrameworkType::AutoGen, &FrameworkType::Mastra));
+    }
+
+    #[test]
+    fn test_convert_from_langchain_to_a2a() {
+        let mut converter = MessageConverter::new();
+
+        let langchain_msg = json!({
+            "role": "human",
+            "content": "Test message from LangChain",
+            "additional_kwargs": {
+                "source": "langchain"
+            }
+        });
+
+        let result = converter.convert_to_a2a(langchain_msg, FrameworkType::LangChain);
+        assert!(result.is_ok());
+
+        let a2a_msg = result.unwrap();
+        assert_eq!(a2a_msg.role, MessageRole::User);
+        assert_eq!(a2a_msg.parts.len(), 1);
+
+        if let MessagePart::Text(text_part) = &a2a_msg.parts[0] {
+            assert_eq!(text_part.text, "Test message from LangChain");
+        } else {
+            panic!("Expected text part");
+        }
+    }
+}

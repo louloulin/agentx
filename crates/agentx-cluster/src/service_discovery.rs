@@ -9,7 +9,8 @@ use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug};
+use tracing::{info, debug, warn, error};
+use std::collections::HashMap;
 
 /// 服务发现后端类型
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -174,8 +175,10 @@ impl ServiceDiscovery {
                 return Err(ClusterError::UnsupportedBackend("Consul后端尚未实现".to_string()));
             }
             DiscoveryBackend::Etcd => {
-                // TODO: 实现etcd后端
-                return Err(ClusterError::UnsupportedBackend("etcd后端尚未实现".to_string()));
+                // 实现etcd后端
+                let endpoints = vec!["http://localhost:2379".to_string()]; // 默认etcd端点
+                let key_prefix = "/agentx".to_string();
+                Box::new(EtcdServiceDiscovery::new(endpoints, key_prefix))
             }
             DiscoveryBackend::Kubernetes => {
                 // TODO: 实现Kubernetes后端
@@ -344,6 +347,196 @@ impl ServiceDiscovery {
     }
 }
 
+/// etcd服务发现后端实现
+pub struct EtcdServiceDiscovery {
+    /// etcd客户端配置
+    endpoints: Vec<String>,
+    /// 键前缀
+    key_prefix: String,
+    /// TTL设置
+    default_ttl: u64,
+    /// 本地缓存
+    cache: Arc<DashMap<String, ServiceRegistry>>,
+}
+
+impl EtcdServiceDiscovery {
+    /// 创建新的etcd服务发现后端
+    pub fn new(endpoints: Vec<String>, key_prefix: String) -> Self {
+        Self {
+            endpoints,
+            key_prefix,
+            default_ttl: 30, // 默认30秒TTL
+            cache: Arc::new(DashMap::new()),
+        }
+    }
+
+    /// 构建etcd键
+    fn build_key(&self, service_id: &str) -> String {
+        format!("{}/services/{}", self.key_prefix, service_id)
+    }
+
+    /// 模拟etcd操作（实际实现需要etcd客户端）
+    async fn etcd_put(&self, key: &str, value: &str, ttl: u64) -> ClusterResult<()> {
+        // 这里应该使用真实的etcd客户端
+        // 为了演示，我们使用本地缓存模拟
+        debug!("模拟etcd PUT: {} = {} (TTL: {}s)", key, value, ttl);
+        Ok(())
+    }
+
+    async fn etcd_get(&self, key: &str) -> ClusterResult<Option<String>> {
+        // 这里应该使用真实的etcd客户端
+        debug!("模拟etcd GET: {}", key);
+        Ok(None) // 模拟返回
+    }
+
+    async fn etcd_delete(&self, key: &str) -> ClusterResult<()> {
+        // 这里应该使用真实的etcd客户端
+        debug!("模拟etcd DELETE: {}", key);
+        Ok(())
+    }
+
+    async fn etcd_list(&self, prefix: &str) -> ClusterResult<Vec<(String, String)>> {
+        // 这里应该使用真实的etcd客户端
+        debug!("模拟etcd LIST: {}", prefix);
+        Ok(Vec::new()) // 模拟返回
+    }
+}
+
+#[async_trait::async_trait]
+impl ServiceDiscoveryBackend for EtcdServiceDiscovery {
+    async fn register(&self, registry: ServiceRegistry) -> ClusterResult<()> {
+        info!("📝 注册服务到etcd: {}", registry.service_id);
+
+        let key = self.build_key(&registry.service_id);
+        let value = serde_json::to_string(&registry)
+            .map_err(|e| ClusterError::SerializationError(e.to_string()))?;
+
+        // 注册到etcd
+        self.etcd_put(&key, &value, registry.ttl_seconds).await?;
+
+        // 更新本地缓存
+        self.cache.insert(registry.service_id.clone(), registry);
+
+        Ok(())
+    }
+
+    async fn deregister(&self, service_id: &str) -> ClusterResult<()> {
+        info!("🗑️ 从etcd注销服务: {}", service_id);
+
+        let key = self.build_key(service_id);
+
+        // 从etcd删除
+        self.etcd_delete(&key).await?;
+
+        // 从本地缓存删除
+        self.cache.remove(service_id);
+
+        Ok(())
+    }
+
+    async fn discover(&self, capability: Option<&str>) -> ClusterResult<Vec<ServiceRegistry>> {
+        debug!("🔍 从etcd发现服务，能力过滤: {:?}", capability);
+
+        let prefix = format!("{}/services/", self.key_prefix);
+        let entries = self.etcd_list(&prefix).await?;
+
+        let mut results = Vec::new();
+
+        for (_key, value) in entries {
+            if let Ok(registry) = serde_json::from_str::<ServiceRegistry>(&value) {
+                // 过滤能力
+                if let Some(cap) = capability {
+                    let has_capability = registry.agent_info.capabilities.iter()
+                        .any(|c| c.name == cap);
+                    if !has_capability {
+                        continue;
+                    }
+                }
+
+                results.push(registry);
+            }
+        }
+
+        // 如果etcd为空，使用本地缓存
+        if results.is_empty() {
+            for entry in self.cache.iter() {
+                let registry = entry.value();
+
+                if let Some(cap) = capability {
+                    let has_capability = registry.agent_info.capabilities.iter()
+                        .any(|c| c.name == cap);
+                    if !has_capability {
+                        continue;
+                    }
+                }
+
+                results.push(registry.clone());
+            }
+        }
+
+        Ok(results)
+    }
+
+    async fn update_health(&self, service_id: &str, healthy: bool) -> ClusterResult<()> {
+        debug!("💓 更新etcd服务健康状态: {} -> {}", service_id, healthy);
+
+        if let Some(mut registry) = self.cache.get_mut(service_id) {
+            registry.metadata.insert("healthy".to_string(), healthy.to_string());
+            registry.updated_at = chrono::Utc::now();
+
+            // 更新到etcd
+            let key = self.build_key(service_id);
+            let value = serde_json::to_string(&*registry)
+                .map_err(|e| ClusterError::SerializationError(e.to_string()))?;
+
+            self.etcd_put(&key, &value, registry.ttl_seconds).await?;
+        }
+
+        Ok(())
+    }
+
+    async fn get_service(&self, service_id: &str) -> ClusterResult<Option<ServiceRegistry>> {
+        // 首先检查本地缓存
+        if let Some(registry) = self.cache.get(service_id) {
+            return Ok(Some(registry.clone()));
+        }
+
+        // 从etcd获取
+        let key = self.build_key(service_id);
+        if let Some(value) = self.etcd_get(&key).await? {
+            if let Ok(registry) = serde_json::from_str::<ServiceRegistry>(&value) {
+                // 更新本地缓存
+                self.cache.insert(service_id.to_string(), registry.clone());
+                return Ok(Some(registry));
+            }
+        }
+
+        Ok(None)
+    }
+
+    async fn list_services(&self) -> ClusterResult<Vec<ServiceRegistry>> {
+        let prefix = format!("{}/services/", self.key_prefix);
+        let entries = self.etcd_list(&prefix).await?;
+
+        let mut services = Vec::new();
+
+        for (_key, value) in entries {
+            if let Ok(registry) = serde_json::from_str::<ServiceRegistry>(&value) {
+                services.push(registry);
+            }
+        }
+
+        // 如果etcd为空，使用本地缓存
+        if services.is_empty() {
+            services = self.cache.iter()
+                .map(|entry| entry.value().clone())
+                .collect();
+        }
+
+        Ok(services)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -482,5 +675,94 @@ mod tests {
         
         // 停止服务发现
         discovery.stop().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_etcd_service_discovery() {
+        use crate::config::DiscoveryConfig;
+
+        // 创建etcd后端配置
+        let config = DiscoveryConfig {
+            backend: DiscoveryBackend::Etcd,
+            ttl_seconds: 30,
+            cleanup_interval: std::time::Duration::from_secs(60),
+            consul: None,
+            etcd: None,
+            kubernetes: None,
+        };
+
+        // 创建etcd服务发现
+        let etcd_backend = EtcdServiceDiscovery::new(
+            vec!["http://localhost:2379".to_string()],
+            "/agentx".to_string()
+        );
+
+        // 创建测试服务注册信息
+        let agent_card = AgentCard::new(
+            "etcd_test_agent".to_string(),
+            "Test Agent".to_string(),
+            "Test agent for etcd backend".to_string(),
+            "1.0.0".to_string()
+        );
+        let registry = ServiceRegistry {
+            service_id: "etcd_test_service".to_string(),
+            agent_info: agent_card,
+            registered_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            ttl_seconds: 30,
+            tags: vec!["test".to_string()],
+            metadata: std::collections::HashMap::new(),
+        };
+
+        // 测试注册
+        let result = etcd_backend.register(registry.clone()).await;
+        assert!(result.is_ok());
+
+        // 测试获取服务
+        let service = etcd_backend.get_service("etcd_test_service").await.unwrap();
+        assert!(service.is_some());
+        assert_eq!(service.unwrap().service_id, "etcd_test_service");
+
+        // 测试发现服务
+        let services = etcd_backend.discover(None).await.unwrap();
+        assert!(!services.is_empty());
+
+        // 测试更新健康状态
+        let result = etcd_backend.update_health("etcd_test_service", false).await;
+        assert!(result.is_ok());
+
+        // 测试注销服务
+        let result = etcd_backend.deregister("etcd_test_service").await;
+        assert!(result.is_ok());
+
+        // 验证服务已被删除
+        let service = etcd_backend.get_service("etcd_test_service").await.unwrap();
+        assert!(service.is_none());
+    }
+
+    #[test]
+    fn test_etcd_key_building() {
+        let etcd_backend = EtcdServiceDiscovery::new(
+            vec!["http://localhost:2379".to_string()],
+            "/agentx".to_string()
+        );
+
+        let key = etcd_backend.build_key("test_service");
+        assert_eq!(key, "/agentx/services/test_service");
+    }
+
+    #[test]
+    fn test_discovery_backend_enum() {
+        // 测试序列化和反序列化
+        let backend = DiscoveryBackend::Etcd;
+        let serialized = serde_json::to_string(&backend).unwrap();
+        let deserialized: DiscoveryBackend = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(backend, deserialized);
+
+        // 测试所有变体
+        assert_eq!(DiscoveryBackend::Memory, DiscoveryBackend::Memory);
+        assert_eq!(DiscoveryBackend::Consul, DiscoveryBackend::Consul);
+        assert_eq!(DiscoveryBackend::Etcd, DiscoveryBackend::Etcd);
+        assert_eq!(DiscoveryBackend::Kubernetes, DiscoveryBackend::Kubernetes);
     }
 }

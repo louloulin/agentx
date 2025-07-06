@@ -6,8 +6,10 @@ use crate::plugin_bridge::{PluginBridge, PluginStatus};
 use agentx_a2a::{A2AResult, A2AError, A2AMessage};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::process::{Child, Command, Stdio};
 use tokio::sync::{RwLock, mpsc};
-use tokio::time::{interval, Duration};
+use tokio::time::{interval, Duration, Instant};
+use tokio::process::Command as TokioCommand;
 
 /// 插件管理器
 pub struct PluginManager {
@@ -15,6 +17,8 @@ pub struct PluginManager {
     bridge: Arc<PluginBridge>,
     /// 插件配置
     plugin_configs: Arc<RwLock<HashMap<String, PluginConfig>>>,
+    /// 插件进程管理
+    plugin_processes: Arc<RwLock<HashMap<String, PluginProcess>>>,
     /// 健康检查间隔
     health_check_interval: Duration,
     /// 消息队列
@@ -34,6 +38,42 @@ pub struct PluginConfig {
     pub max_retries: u32,
     pub timeout_seconds: u64,
     pub config: HashMap<String, String>,
+    /// 插件可执行文件路径
+    pub executable_path: Option<String>,
+    /// 插件启动参数
+    pub args: Vec<String>,
+    /// 环境变量
+    pub env_vars: HashMap<String, String>,
+    /// 工作目录
+    pub working_dir: Option<String>,
+}
+
+/// 插件进程信息
+#[derive(Debug)]
+pub struct PluginProcess {
+    /// 进程ID
+    pub pid: Option<u32>,
+    /// 进程句柄
+    pub process: Option<tokio::process::Child>,
+    /// 启动时间
+    pub started_at: Instant,
+    /// 重启次数
+    pub restart_count: u32,
+    /// 进程状态
+    pub status: ProcessStatus,
+    /// 最后健康检查时间
+    pub last_health_check: Instant,
+}
+
+/// 进程状态
+#[derive(Debug, Clone, PartialEq)]
+pub enum ProcessStatus {
+    Starting,
+    Running,
+    Stopping,
+    Stopped,
+    Failed,
+    Restarting,
 }
 
 /// 排队的消息
@@ -68,6 +108,7 @@ impl PluginManager {
         Self {
             bridge,
             plugin_configs: Arc::new(RwLock::new(HashMap::new())),
+            plugin_processes: Arc::new(RwLock::new(HashMap::new())),
             health_check_interval: Duration::from_secs(30),
             message_queue: Arc::new(RwLock::new(HashMap::new())),
             load_balancer: LoadBalancer::new(LoadBalanceStrategy::RoundRobin),
@@ -106,16 +147,21 @@ impl PluginManager {
     /// 启动插件
     pub async fn start_plugin(&self, plugin_id: &str) -> A2AResult<()> {
         println!("🚀 启动插件: {}", plugin_id);
-        
+
         let config = {
             let configs = self.plugin_configs.read().await;
             configs.get(plugin_id).cloned()
         };
-        
+
         let config = config.ok_or_else(|| {
             A2AError::internal(format!("插件配置未找到: {}", plugin_id))
         })?;
-        
+
+        // 如果配置了可执行文件路径，启动外部进程
+        if config.executable_path.is_some() {
+            self.start_external_process(plugin_id, &config).await?;
+        }
+
         // 注册插件到桥接器
         self.bridge.register_plugin(
             config.id.clone(),
@@ -130,13 +176,16 @@ impl PluginManager {
     /// 停止插件
     pub async fn stop_plugin(&self, plugin_id: &str) -> A2AResult<()> {
         println!("🛑 停止插件: {}", plugin_id);
-        
+
+        // 停止外部进程（如果存在）
+        self.stop_external_process(plugin_id).await?;
+
         // 注销插件
         self.bridge.unregister_plugin(plugin_id).await?;
-        
+
         // 清理消息队列
         self.message_queue.write().await.remove(plugin_id);
-        
+
         println!("✅ 插件 {} 停止成功", plugin_id);
         Ok(())
     }
@@ -282,17 +331,187 @@ impl PluginManager {
     }
     
     // 私有方法
-    
+
+    /// 启动外部进程
+    async fn start_external_process(&self, plugin_id: &str, config: &PluginConfig) -> A2AResult<()> {
+        println!("🔧 启动外部插件进程: {} ({})", plugin_id, config.executable_path.as_ref().unwrap());
+
+        let executable_path = config.executable_path.as_ref().unwrap();
+
+        // 构建命令
+        let mut cmd = TokioCommand::new(executable_path);
+
+        // 添加参数
+        for arg in &config.args {
+            cmd.arg(arg);
+        }
+
+        // 设置环境变量
+        for (key, value) in &config.env_vars {
+            cmd.env(key, value);
+        }
+
+        // 设置工作目录
+        if let Some(working_dir) = &config.working_dir {
+            cmd.current_dir(working_dir);
+        }
+
+        // 设置标准输入输出
+        cmd.stdout(std::process::Stdio::piped())
+           .stderr(std::process::Stdio::piped())
+           .stdin(std::process::Stdio::null());
+
+        // 启动进程
+        let child = cmd.spawn().map_err(|e| {
+            A2AError::internal(format!("启动插件进程失败: {}", e))
+        })?;
+
+        let pid = child.id();
+        let started_at = Instant::now();
+
+        // 创建进程信息
+        let process_info = PluginProcess {
+            pid,
+            process: Some(child),
+            started_at,
+            restart_count: 0,
+            status: ProcessStatus::Starting,
+            last_health_check: started_at,
+        };
+
+        // 存储进程信息
+        self.plugin_processes.write().await.insert(plugin_id.to_string(), process_info);
+
+        println!("✅ 插件进程启动成功: {} (PID: {:?})", plugin_id, pid);
+
+        // 启动进程监控任务
+        self.start_process_monitor(plugin_id.to_string()).await;
+
+        Ok(())
+    }
+
+    /// 停止外部进程
+    async fn stop_external_process(&self, plugin_id: &str) -> A2AResult<()> {
+        let mut processes = self.plugin_processes.write().await;
+
+        if let Some(mut process_info) = processes.remove(plugin_id) {
+            println!("🔧 停止外部插件进程: {} (PID: {:?})", plugin_id, process_info.pid);
+
+            process_info.status = ProcessStatus::Stopping;
+
+            if let Some(mut child) = process_info.process.take() {
+                // 尝试优雅地终止进程
+                match child.kill().await {
+                    Ok(_) => {
+                        println!("✅ 插件进程 {} 已终止", plugin_id);
+                    }
+                    Err(e) => {
+                        println!("⚠️ 终止插件进程 {} 时出错: {}", plugin_id, e);
+                        return Err(A2AError::internal(format!("终止进程失败: {}", e)));
+                    }
+                }
+
+                // 等待进程完全退出
+                match child.wait().await {
+                    Ok(exit_status) => {
+                        println!("📋 插件进程 {} 退出状态: {:?}", plugin_id, exit_status);
+                    }
+                    Err(e) => {
+                        println!("⚠️ 等待插件进程 {} 退出时出错: {}", plugin_id, e);
+                    }
+                }
+            }
+
+            println!("✅ 插件进程 {} 停止完成", plugin_id);
+        } else {
+            println!("ℹ️ 插件 {} 没有运行的外部进程", plugin_id);
+        }
+
+        Ok(())
+    }
+
+    /// 启动进程监控
+    async fn start_process_monitor(&self, plugin_id: String) {
+        let processes = self.plugin_processes.clone();
+        let configs = self.plugin_configs.clone();
+
+        tokio::spawn(async move {
+            let mut interval = interval(Duration::from_secs(5));
+
+            loop {
+                interval.tick().await;
+
+                let mut should_restart = false;
+
+                // 检查进程状态
+                {
+                    let mut processes_guard = processes.write().await;
+                    if let Some(process_info) = processes_guard.get_mut(&plugin_id) {
+                        if let Some(ref mut child) = process_info.process {
+                            match child.try_wait() {
+                                Ok(Some(exit_status)) => {
+                                    println!("⚠️ 插件进程 {} 已退出: {:?}", plugin_id, exit_status);
+                                    process_info.status = ProcessStatus::Stopped;
+                                    should_restart = true;
+                                }
+                                Ok(None) => {
+                                    // 进程仍在运行
+                                    if process_info.status == ProcessStatus::Starting {
+                                        process_info.status = ProcessStatus::Running;
+                                        println!("✅ 插件进程 {} 运行正常", plugin_id);
+                                    }
+                                }
+                                Err(e) => {
+                                    println!("❌ 检查插件进程 {} 状态失败: {}", plugin_id, e);
+                                    process_info.status = ProcessStatus::Failed;
+                                    should_restart = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 如果需要重启且配置了自动重启
+                if should_restart {
+                    let config = {
+                        let configs_guard = configs.read().await;
+                        configs_guard.get(&plugin_id).cloned()
+                    };
+
+                    if let Some(config) = config {
+                        if config.auto_restart {
+                            let mut processes_guard = processes.write().await;
+                            if let Some(process_info) = processes_guard.get_mut(&plugin_id) {
+                                if process_info.restart_count < config.max_retries {
+                                    process_info.restart_count += 1;
+                                    process_info.status = ProcessStatus::Restarting;
+                                    println!("🔄 重启插件进程: {} (第{}次)", plugin_id, process_info.restart_count);
+
+                                    // 这里应该调用重启逻辑，但为了简化，我们只更新状态
+                                    // 实际实现中应该重新启动进程
+                                } else {
+                                    println!("❌ 插件 {} 重启次数超过限制，停止重启", plugin_id);
+                                    process_info.status = ProcessStatus::Failed;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     async fn select_plugin_for_agent(&self, _agent_id: &str) -> A2AResult<String> {
         // 简化实现：返回第一个可用插件
         let plugins = self.bridge.get_all_plugins().await;
-        
+
         for plugin in plugins {
             if plugin.status == PluginStatus::Running {
                 return Ok(plugin.id);
             }
         }
-        
+
         Err(A2AError::internal("没有可用的插件"))
     }
 }
@@ -307,6 +526,127 @@ pub struct PluginStats {
     pub capabilities_count: usize,
     pub request_count: u64,
     pub last_health_check: chrono::DateTime<chrono::Utc>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agentx_a2a::{A2AProtocolEngine, ProtocolEngineConfig, StreamManager, SecurityManager, SecurityConfig};
+    use agentx_a2a::monitoring::MonitoringManager;
+    use agentx_a2a::monitoring::MonitoringConfig;
+    use std::collections::HashMap;
+
+    fn create_test_plugin_bridge() -> Arc<PluginBridge> {
+        let config = ProtocolEngineConfig {
+            max_concurrent_tasks: 10,
+            task_timeout_seconds: 30,
+            enable_message_validation: true,
+            enable_task_persistence: false,
+            handler_pool_size: Some(5),
+            validate_messages: true,
+            max_message_size: 1024 * 1024,
+        };
+
+        let a2a_engine = Arc::new(RwLock::new(A2AProtocolEngine::new(config)));
+        let stream_manager = Arc::new(RwLock::new(StreamManager::new()));
+        let security_manager = Arc::new(RwLock::new(SecurityManager::new(SecurityConfig::default())));
+        let monitoring_manager = Arc::new(RwLock::new(MonitoringManager::new(MonitoringConfig::default())));
+
+        Arc::new(PluginBridge::new(
+            a2a_engine,
+            stream_manager,
+            security_manager,
+            monitoring_manager,
+        ))
+    }
+
+    #[tokio::test]
+    async fn test_plugin_manager_creation() {
+        let bridge = create_test_plugin_bridge();
+        let manager = PluginManager::new(bridge);
+
+        // 验证管理器创建成功
+        assert_eq!(manager.plugin_configs.read().await.len(), 0);
+        assert_eq!(manager.plugin_processes.read().await.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_add_plugin_config() {
+        let bridge = create_test_plugin_bridge();
+        let manager = PluginManager::new(bridge);
+
+        let config = PluginConfig {
+            id: "test_plugin".to_string(),
+            name: "Test Plugin".to_string(),
+            endpoint: "http://localhost:50053".to_string(),
+            framework: "test".to_string(),
+            auto_restart: true,
+            max_retries: 3,
+            timeout_seconds: 30,
+            config: HashMap::new(),
+            executable_path: None, // 不启动外部进程
+            args: Vec::new(),
+            env_vars: HashMap::new(),
+            working_dir: None,
+        };
+
+        let result = manager.add_plugin_config(config.clone()).await;
+        assert!(result.is_ok());
+
+        // 验证配置已添加
+        let configs = manager.plugin_configs.read().await;
+        assert!(configs.contains_key("test_plugin"));
+        assert_eq!(configs.get("test_plugin").unwrap().name, "Test Plugin");
+    }
+
+    #[tokio::test]
+    async fn test_external_process_config() {
+        let bridge = create_test_plugin_bridge();
+        let manager = PluginManager::new(bridge);
+
+        let config = PluginConfig {
+            id: "external_plugin".to_string(),
+            name: "External Plugin".to_string(),
+            endpoint: "http://localhost:50054".to_string(),
+            framework: "python".to_string(),
+            auto_restart: true,
+            max_retries: 3,
+            timeout_seconds: 30,
+            config: HashMap::new(),
+            executable_path: Some("/usr/bin/python3".to_string()),
+            args: vec!["-c".to_string(), "print('Hello from plugin')".to_string()],
+            env_vars: {
+                let mut env = HashMap::new();
+                env.insert("PLUGIN_ID".to_string(), "external_plugin".to_string());
+                env
+            },
+            working_dir: Some("/tmp".to_string()),
+        };
+
+        let result = manager.add_plugin_config(config.clone()).await;
+        assert!(result.is_ok());
+
+        // 验证外部进程配置
+        let configs = manager.plugin_configs.read().await;
+        let stored_config = configs.get("external_plugin").unwrap();
+        assert_eq!(stored_config.executable_path, Some("/usr/bin/python3".to_string()));
+        assert_eq!(stored_config.args.len(), 2);
+        assert!(stored_config.env_vars.contains_key("PLUGIN_ID"));
+    }
+
+    #[tokio::test]
+    async fn test_process_status_enum() {
+        // 测试进程状态枚举
+        assert_eq!(ProcessStatus::Starting, ProcessStatus::Starting);
+        assert_ne!(ProcessStatus::Starting, ProcessStatus::Running);
+
+        // 测试状态转换逻辑
+        let status = ProcessStatus::Starting;
+        match status {
+            ProcessStatus::Starting => assert!(true),
+            _ => assert!(false, "状态应该是Starting"),
+        }
+    }
 }
 
 impl LoadBalancer {

@@ -120,6 +120,10 @@ impl AgentXPlugin for AgentXGrpcServer {
             max_retries: 3,
             timeout_seconds: 30,
             config: req.config,
+            executable_path: None, // 对于gRPC客户端连接，不需要启动外部进程
+            args: Vec::new(),
+            env_vars: std::collections::HashMap::new(),
+            working_dir: None,
         };
         
         // 添加插件配置
