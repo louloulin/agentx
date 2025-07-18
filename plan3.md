@@ -1218,7 +1218,7 @@ if __name__ == "__main__":
 ```python
 # requirements.txt
 agentx-plugin-sdk==0.1.0
-pyautogen==0.2.0
+ag2==0.2.0
 grpcio==1.58.0
 grpcio-tools==1.58.0
 
